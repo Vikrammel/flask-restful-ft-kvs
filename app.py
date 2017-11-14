@@ -10,13 +10,30 @@ import datetime
 app = Flask(__name__)
 api = Api(app)
 newline = "&#13;&#10;"
+
+# Get environment variables
 K = os.environ.get('K')
-EXIP = os.environ.get('IP')
-PORT = os.environ.get('PORT')
-mainAddr = os.environ.get('MAINIP')
-http_str = 'http://' #string to prepend onto URLs
-#Dictionary where key->value pairs will be stored.
+IpPort = os.environ.get('IPPORT')
+View = os.environ.get('VIEW')
+isReplica = False
+
+# string to prepend onto URL
+http_str = 'http://'  
+
+# Dictionary where key->value pairs will be stored.
 d = {}
+
+# Arrays to store replicas and proxies 
+replicas = []
+proxies = []
+
+# Check to see if more replicas are needed
+if len(replicas) < K:
+    replicas.append(IpPort)
+    isReplica = True
+else:
+    proxies.append(IpPort)
+    
 
 class Handle(Resource):
     if mainAddr is None:
