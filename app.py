@@ -28,15 +28,16 @@ view = []
 replicas = []
 proxies = []
 
+# Initialize view array based on Environment Variable 'VIEW'
 view = EnvView.split(",")
+pos = view.index(IpPort)
 
-# Check to see if more replicas are needed 
-if len(replicas) < K:
+# Initialize node as replica or proxy 
+if pos < K:
     replicas.append(IpPort)
-    isReplica = True
 else:
     proxies.append(IpPort)
-    
+
 
 class Handle(Resource):
 
