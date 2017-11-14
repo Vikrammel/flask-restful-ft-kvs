@@ -30,20 +30,21 @@ class Handle(Resource):
 
         #Handles PUT request
         def put(self, key):
-			#Makes sure a value was actually supplied in the PUT.
             try:
                 value = request.form['val']
             except:
+                value = ''
                 pass
+            #Makes sure a value was actually supplied in the PUT.
             if not value:
                 return {'result': 'Error', 'msg': 'No value provided'}, 403
-			
             #Restricts key length to 1<=key<=200 characters.
             if not 1 <= len(str(key)) <= 200:
                 return {'result': 'Error', 'msg': 'Key not valid'}, 403
             #Restricts key to alphanumeric - both uppercase and lowercase, 0-9, and _
             if not re.match(r'^\w+$', key):
                 return {'result': 'Error', 'msg': 'Key not valid'}, 403
+
             #Restricts value to a maximum of 1Mbyte.
             if sys.getsizeof(value) > 1000000:
                 return {'result': 'Error', 'msg': 'Object too large. Size limit is 1MB'}, 403
@@ -72,23 +73,23 @@ class Handle(Resource):
             #try requesting primary
             try:
                 response = requests.get(http_str + mainAddr + '/kv-store/' + key)
-            except requests.exceptions.RequestException as exc: #handle primary failure upon get request
-                return {'result': 'Error', 'msg': 'Server unavailable'}, 500
+            except requests.exceptions.RequestException as exc: #handle primary failure upon put request
+                return {'result': 'Error','msg': 'Server unavailable'}, 500
             return response.json()
 
         def put(self,key):
-            #try requesting primary
-			#Makes sure a value was actually supplied in the PUT.
             try:
                 value = request.form['val']
             except:
+                value = ''
                 pass
+            #Makes sure a value was actually supplied in the PUT.
             if not value:
                 return {'result': 'Error', 'msg': 'No value provided'}, 403
             try:
                 response = requests.put((http_str + mainAddr + '/kv-store/' + key), data = {'val': value})
             except requests.exceptions.RequestException as exc: #handle primary failure upon put request
-                return {'result': 'Error', 'msg': 'Server unavailable'}, 500
+                return {'result': 'Error','msg': 'Server unavailable'}, 500
             return response.json()
 
         def delete(self, key):
@@ -96,9 +97,9 @@ class Handle(Resource):
             try:
                 response = requests.delete(http_str + mainAddr + '/kv-store/' + key)
             except requests.exceptions.RequestException as exc: #handle primary failure upon delete request
-                return {'result': 'Error', 'msg': 'Server unavailable'}, 500
+                return {'result': 'Error','msg': 'Server unavailable'}, 500
             return response.json()
-
 api.add_resource(Handle, '/kv-store/<key>')
+
 if __name__ == "__main__":
     app.run(host=EXIP, port=PORT)
