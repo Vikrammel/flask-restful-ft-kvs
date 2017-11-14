@@ -15,7 +15,7 @@ newline = "&#13;&#10;"
 K = os.environ.get('K')
 IpPort = os.environ.get('IPPORT')
 EnvView = os.environ.get('VIEW')
-isReplica = False
+isReplica = 'No'
 
 # string to prepend onto URL
 http_str = 'http://'  
@@ -39,6 +39,15 @@ else:
     
 
 class Handle(Resource):
+
+    #returns if node is a replica
+    def get_node_details():
+        return {"result":"success", "replica": isReplica}, 200
+    
+    #returns list of replicas
+    def get_all_replicas():
+        return {"result":"success", "replicas": replicas}, 200
+
     if mainAddr is None:
         #Handles GET request
         def get(self, key):
