@@ -14,7 +14,7 @@ newline = "&#13;&#10;"
 # Get environment variables
 K = os.environ.get('K')
 IpPort = os.environ.get('IPPORT')
-View = os.environ.get('VIEW')
+EnvView = os.environ.get('VIEW')
 isReplica = False
 
 # string to prepend onto URL
@@ -24,10 +24,13 @@ http_str = 'http://'
 d = {}
 
 # Arrays to store replicas and proxies 
+view = []
 replicas = []
 proxies = []
 
-# Check to see if more replicas are needed
+view = EnvView.split(",")
+
+# Check to see if more replicas are needed 
 if len(replicas) < K:
     replicas.append(IpPort)
     isReplica = True
