@@ -78,9 +78,13 @@ class Handle(Resource):
 
         def put(self,key):
             #try requesting primary
-			if 'val' not in globals():
-			    return {'result': 'Error', 'msg': 'No value provided'}, 403
-            value = str(request.form['val'])
+			#Makes sure a value was actually supplied in the PUT.
+            try:
+                value = request.form['val']
+            except:
+                pass
+            if not value:
+                return {'result': 'Error', 'msg': 'No value provided'}, 403
             try:
                 response = requests.put((http_str + mainAddr + '/kv-store/' + key), data = {'val': value})
             except requests.exceptions.RequestException as exc: #handle primary failure upon put request
