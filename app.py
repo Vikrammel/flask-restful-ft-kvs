@@ -43,14 +43,6 @@ else:
 
 class Handle(Resource):
     if isReplica:
-        #Returns if node is a replica.
-        def get_node_details():
-            return {"result": "success", "replica": isReplica}, 200
-        
-        #Returns list of replicas.
-        def get_all_replicas():
-            return {"result": "success", "replicas": replicas}, 200
-        
         #Handles adding/deleting nodes.
         def update_view(type, ip_port):
             if type = 'add':
@@ -71,6 +63,12 @@ class Handle(Resource):
         
           #Handles GET request
           def get(self, key):
+                # If Key is get_node_details
+                if key == 'get_node_details'
+                    return {"result": "success", "replica": isReplica}, 200
+                        #Returns list of replicas.
+                if key == 'get_all_replicas'
+                    return {"result": "success", "replicas": replicas}, 200
                 #If key is not in dict, return error.
                 if key not in d:
                      return {'result': 'Error', 'msg': 'Key does not exist', 'node_id': IpPort, 'causal_payload': vClock, 'timestamp': datetime.datetime.now().time()}, 404
