@@ -72,14 +72,11 @@ class Handle(Resource):
                         #make new replica
                     else:
                         #make new proxy
-                    return {"msg": "success", "node_id": , "number_of_nodes": view.len}, 200
+                    return {"msg": "success", "node_id": ip_port, "number_of_nodes": view.len}, 200
                 if type = 'remove':
-                    if (replicas.len - 1) < K:
-                        if proxies.len > 0:
-                            #repurpose proxy into replica
-                        #kill node
-                    else:
-                        #make new proxy
+                    if isReplica && (replicas.len - 1) < K && proxies.len > 0:
+						#repurpose proxy into replica
+                    #kill node
                     return {"msg": "success", "number_of_nodes": view.len}, 200
                 return {'result': 'error', 'msg': 'Request type not valid'}, 403
             
@@ -157,5 +154,5 @@ class Handle(Resource):
 api.add_resource(Handle, '/kv-store/<key>')
 
 if __name__ == "__main__":
-    localAddress = EnvView.split(":")
+    localAddress = IpPort.split(":")
     app.run(host=localAddress[0], port=localAddress[1])
