@@ -43,12 +43,12 @@ else:
 
 class Handle(Resource):
     if isReplica:
-          #Handles GET request
+        #Handles GET request
         def get(self, key):
             # If Key is get_node_details
             if key == 'get_node_details'
                 return {"result": "success", "replica": isReplica}, 200
-                    #Returns list of replicas.
+            #Returns list of replicas.
             if key == 'get_all_replicas'
                 return {"result": "success", "replicas": replicas}, 200
             #If key is not in dict, return error.
@@ -57,24 +57,23 @@ class Handle(Resource):
             #If key is in dict, return its corresponding value.
             return {'result': 'Success', 'value': d[key], 'node_id': IpPort, 'causal_payload': vClock, 'timestamp': datetime.datetime.now().time()}, 200
 
-          #Handles PUT request
+        #Handles PUT request
         def put(self, key):
-                      #Handles adding/deleting nodes.
-        
+            #Handles adding/deleting nodes.
             if key == 'update_view':
                 if type = 'add':
                     if replicas.len < K:
-                        #make new replica
+                    #make new replica
                     else:
-                        #make new proxy
+                    #make new proxy
                     return {"msg": "success", "node_id": , "number_of_nodes": view.len}, 200
                 if type = 'remove':
                     if (replicas.len - 1) < K:
                         if proxies.len > 0:
-                            #repurpose proxy into replica
+                        #repurpose proxy into replica
                         #kill node
                     else:
-                        #make new proxy
+                    #make new proxy
                     return {"msg": "success", "number_of_nodes": view.len}, 200
                 return {'result': 'error', 'msg': 'Request type not valid'}, 403
 
@@ -107,7 +106,7 @@ class Handle(Resource):
             d[key] = value
             return {'replaced': 'True', 'msg': 'Value of existing key replaced', 'node_id': IpPort, 'causal_payload': vClock, 'timestamp': datetime.datetime.now().time()}, 200
                     
-          #Handles DEL request
+        #Handles DEL request
         def delete(self, key):
             #If key is not in dict, return error.
             if key not in d:
@@ -136,7 +135,7 @@ class Handle(Resource):
                     pass
             if not value:
                     return {'result': 'Error', 'msg': 'No value provided', 'node_id': IP, 'causal_payload': vClock, 'timestamp': datetime.datetime.now().time()}, 403
-        #Try requesting primary.
+            #Try requesting primary.
             try:
                     response = requests.put((http_str + mainAddr + '/kv-store/' + key), data = {'val': value})
             except requests.exceptions.RequestException as exc: #Handle primary failure upon put request.
