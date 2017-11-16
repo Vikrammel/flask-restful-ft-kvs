@@ -18,8 +18,11 @@ EnvView = os.environ.get('VIEW')
 
 # Is this a replica or a proxy?
 isReplica = False
+# Dictionary acting as vector clock. IpPort -> local clock value.
+vClock = {}
+vClock[IpPort] = 0
 # String to prepend onto URL.
-http_str = 'http://'  
+http_str = 'http://'
 
 # Dictionary where key->value pairs will be stored.
 d = {}
@@ -77,6 +80,7 @@ class Handle(Resource):
             if sys.getsizeof(value) > 1000000:
                 return {'result': 'Error', 'msg': 'Object too large. Size limit is 1MB'}, 403
             
+			vClock[IpPort]++;
             #If key is not already in dict, create a new entry.
             if key not in d:
                 d[key] = value
