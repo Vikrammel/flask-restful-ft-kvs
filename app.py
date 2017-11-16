@@ -64,20 +64,26 @@ class Handle(Resource):
             if key == 'update_view':
                 try:
                     type = request.form['type']
+                    ip_payload = request.form['ip_port']
                 except:
                     type = ''
+                    ip_payload = ''
                     pass
-                if type = 'add':
-                    if replicas.len < K:
-                        #make new replica
-                    else:
-                        #make new proxy
-                    return {"msg": "success", "node_id": ip_port, "number_of_nodes": view.len}, 200
-                if type = 'remove':
-                    if replica.index(ip_port) > 0 && proxies.len > 0:
-						#repurpose proxy into replica
-                    #kill node
-                    return {"msg": "success", "number_of_nodes": view.len}, 200
+                if ip_payload not None:
+                    if type = 'add':
+                        if replicas.len < K:
+                            #make new replica
+                        else:
+                            #make new proxy
+                        return {"msg": "success", "node_id": , "number_of_nodes": view.len}, 200
+                    if type = 'remove':
+                        if (replicas.len - 1) < K:
+                            if proxies.len > 0:
+                                #repurpose proxy into replica
+                            #kill node
+                        else:
+                            #make new proxy
+                        return {"msg": "success", "number_of_nodes": view.len}, 200
                 return {'result': 'error', 'msg': 'Request type not valid'}, 403
             
             #Makes sure a value was actually supplied in the PUT.
