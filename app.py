@@ -1,5 +1,5 @@
 #-*- coding: utf-8 -*-
-#app.py for project 2, CMPS128
+#app.py for project 3, CMPS128
 
 from flask import Flask
 from flask import request, abort, jsonify, json
@@ -11,19 +11,19 @@ app = Flask(__name__)
 api = Api(app)
 newline = "&#13;&#10;"
 
-# Get environment variables
+# Get expected environment variables.
 K = os.environ.get('K')
 IpPort = os.environ.get('IPPORT')
 EnvView = os.environ.get('VIEW')
-isReplica = 'No'
 
-# string to prepend onto URL
+# Is this a replica or a proxy?
+isReplica = False
+# String to prepend onto URL.
 http_str = 'http://'  
 
 # Dictionary where key->value pairs will be stored.
 d = {}
-
-# Arrays to store replicas and proxies 
+# Arrays to store replicas and proxies.
 view = []
 replicas = []
 proxies = []
@@ -31,16 +31,14 @@ proxies = []
 # Initialize view array based on Environment Variable 'VIEW'
 view = EnvView.split(",")
 pos = view.index(IpPort)
-
-# Initialize node as replica or proxy 
+# Initialize this node as a replica or a proxy.
 if pos < K:
+	isReplica = True
     replicas.append(IpPort)
 else:
     proxies.append(IpPort)
 
-
 class Handle(Resource):
-
     #returns if node is a replica
     def get_node_details():
         return {"result":"success", "replica": isReplica}, 200
@@ -49,7 +47,7 @@ class Handle(Resource):
     def get_all_replicas():
         return {"result":"success", "replicas": replicas}, 200
 
-    if mainAddr is None:
+    if isReplica:
         #Handles GET request
         def get(self, key):
             #If key is not in dict, return error.
@@ -132,4 +130,5 @@ class Handle(Resource):
 api.add_resource(Handle, '/kv-store/<key>')
 
 if __name__ == "__main__":
-    app.run(host=EXIP, port=PORT)
+	localAddress = EnvView.split(":")
+    app.run(host=localAddress[0], port=localAddress[1])
