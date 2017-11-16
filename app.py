@@ -74,7 +74,7 @@ class Handle(Resource):
                         #make new proxy
                     return {"msg": "success", "node_id": ip_port, "number_of_nodes": view.len}, 200
                 if type = 'remove':
-                    if isReplica && (replicas.len - 1) < K && proxies.len > 0:
+                    if replica.index(ip_port) > 0 && proxies.len > 0:
 						#repurpose proxy into replica
                     #kill node
                     return {"msg": "success", "number_of_nodes": view.len}, 200
