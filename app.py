@@ -12,7 +12,7 @@ api = Api(app)
 newline = "&#13;&#10;"
 
 # Get expected environment variables.
-K = os.environ.get('K')
+K = int(os.environ.get('K'))
 IpPort = os.environ.get('IPPORT')
 EnvView = os.environ.get('VIEW')
 
@@ -38,8 +38,10 @@ pos = view.index(IpPort)
 if pos < K:
     isReplica = True
     replicas.append(IpPort)
+    print("Replica Added, Replica length = " + str(len(replicas)))
 else:
     proxies.append(IpPort)
+    print("Proxie Added, Proxie length = " + str(len(proxies)))
 
 #function to compare 2 vector clocks.
 #return value: -1 -> clock1 smaller, 0 -> concurrent, 1 -> clock2 smaller
@@ -125,7 +127,8 @@ class Handle(Resource):
                 if _type == 'add':
                     print(K)
                     print(len(replicas))
-                    sys.stdout.flush()
+
+                    
                     if (len(replicas) < K):
                         # Creates new replica
                         replicas.append(ip_payload)
