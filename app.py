@@ -45,7 +45,7 @@ else:
 #return value: -1 -> clock1 smaller, 0 -> concurrent, 1 -> clock2 smaller
 def compareClocks(clock1, clock2):
     compareResult = 0
-    if clock1.len() == clock2.len() :   
+    if clock1.len() == clock2.len() :   # might need to change these to len(clock1) ect
         for i in range(0,clock1.len()):
             if clock1[i] < clock2[i] :
                 if compareResult == 1:
@@ -56,6 +56,30 @@ def compareClocks(clock1, clock2):
                     return 0
                 compareResult = 1
     return compareResult
+
+def removeReplica(ip):
+    replicas.remove(ip)
+    view.remove(ip)
+    print("Replica: " + ip + " removed.")
+
+def removeProxie(ip):
+    proxies.remove(ip)
+    view.remove(ip)
+    print("Proxie: " + ip + " removed.")
+
+def updateRatio():
+    # If Replicas is less than K
+    if len(replicas) < K:
+        # Try to convert proxie to replica
+        if len(proxies) > 0:
+            tempNode = proxies[-1]
+            replicas.append(tempNode)
+            removeProxie(tempNode)
+    # If more replicas then needed, convert to proxie        
+    if len(replicas) > K:
+            tempNode = replicas[-1]
+            proxies.append(tempNode)
+            removeReplica(tempNode)
 
 class Handle(Resource):
     if isReplica:
@@ -78,31 +102,59 @@ class Handle(Resource):
         def put(self, key):
             #Special command: Handles adding/deleting nodes.
             if key == 'update_view':
+                # Checks to see if ip_port was given in the data payload
                 try:
                     ip_payload = request.form['ip_port']
                 except:
                     ip_payload = ''
+
+                # Checks to see if request parameter 'type' was given, and what its value is set to
                 try:
                     _type = request.args.get('type')
                 except: 
                     _type = ''
+
+                # If payload is empty
                 if ip_payload == '':
                     return {'result': 'error', 'msg': 'Payload missing'}, 403
                 
+                # Check if IP is already in our view
+                if ip_payload in view:
+                    return {'result': 'error', 'msg': 'Ip is already in view'}, 403
+
                 if _type == 'add':
-                    if replicas.len < K:
-                        #make new replica
-                        pass
+                    print(K)
+                    print(len(replicas))
+                    sys.stdout.flush()
+                    if (len(replicas) < K):
+                        # Creates new replica
+                        replicas.append(ip_payload)
+                        view.append(ip_payload)
+                        print("New replica created.")
+                        sys.stdout.flush()
+                        
                     else:
-                        #make new proxy
-                        pass
-                    return {"msg": "success", "node_id": ip_payload, "number_of_nodes": view.len}, 200
+                        # Creates new 
+                        proxies.append(ip_payload)
+                        view.append(ip_payload)
+                        print("New proxie created.")
+                        sys.stdout.flush()
+                    return {"msg": "success", "node_id": ip_payload, "number_of_nodes": len(view)}, 200
+
                 if _type == 'remove':
-                    if replica.index(ip_payload) > 0 and proxies.len > 0:
-                        #repurpose proxy into replica
-                        pass
-                    #kill node
-                    return {"msg": "success", "number_of_nodes": view.len}, 200
+                    # Check to see if IP is in our view
+                    if ip_payload not in view:
+                        return {'result': 'error', 'msg': 'Cannot remove, IP is not in view'}, 403
+                    
+                    # Check if replica
+                    if replica.index(ip_payload) > 0:
+                        removeReplica(ip_payload)
+                    # Check if proxie
+                    if proxies.index(ip_payload) > 0:
+                        removeProxie(ip_payload)
+                    # Update Replica/Proxie Ratio if needed
+                    updateRatio()
+                    return {"msg": "success", "number_of_nodes": len(view)}, 200
                 return {'result': 'error', 'msg': 'Request type not valid'}, 403
             
             #Makes sure a value was actually supplied in the PUT.
