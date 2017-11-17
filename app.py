@@ -46,10 +46,10 @@ class Handle(Resource):
         #Handles GET request
         def get(self, key):
             #Special command: Returns if node is a replica.
-            if key == 'get_node_details'
+            if key == 'get_node_details':
                 return {"result": "success", "replica": isReplica}, 200
             #Special command: Returns list of replicas.
-            if key == 'get_all_replicas'
+            if key == 'get_all_replicas':
                 return {"result": "success", "replicas": replicas}, 200
             
             #If key is not in dict, return error.
@@ -63,24 +63,28 @@ class Handle(Resource):
             #Special command: Handles adding/deleting nodes.
             if key == 'update_view':
                 try:
-                    type = request.form['type']
                     ip_payload = request.form['ip_port']
                 except:
-                    type = ''
                     ip_payload = ''
-                    pass
-                if ip_payload is '':
+                try:
+                    _type = request.args.get('type')
+                except: 
+                    _type = ''
+                if ip_payload == '':
                     return {'result': 'error', 'msg': 'Payload missing'}, 403
                 
-                if type = 'add':
+                if _type == 'add':
                     if replicas.len < K:
                         #make new replica
+                        pass
                     else:
                         #make new proxy
+                        pass
                     return {"msg": "success", "node_id": ip_payload, "number_of_nodes": view.len}, 200
-                if type = 'remove':
-                    if replica.index(ip_payload) > 0 && proxies.len > 0:
+                if _type == 'remove':
+                    if replica.index(ip_payload) > 0 and proxies.len > 0:
                         #repurpose proxy into replica
+                        pass
                     #kill node
                     return {"msg": "success", "number_of_nodes": view.len}, 200
                 return {'result': 'error', 'msg': 'Request type not valid'}, 403
