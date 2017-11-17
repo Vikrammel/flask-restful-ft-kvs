@@ -41,6 +41,22 @@ if pos < K:
 else:
     proxies.append(IpPort)
 
+#function to compare 2 vector clocks.
+#return value: -1 -> clock1 smaller, 0 -> concurrent, 1 -> clock2 smaller
+def compareClocks(clock1, clock2):
+    compareResult = 0
+    if clock1.len() == clock2.len() :   
+        for i in range(0,clock1.len()):
+            if clock1[i] < clock2[i] :
+                if compareResult == 1:
+                    return 0
+                compareResult = -1
+            if clock2[i] < clock1[i] :
+                if compareResult == -1:
+                    return 0
+                compareResult = 1
+    return compareResult
+
 class Handle(Resource):
     if isReplica:
         #Handles GET request
