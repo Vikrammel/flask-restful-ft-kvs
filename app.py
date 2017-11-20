@@ -85,6 +85,8 @@ def heartBeat():
                     if ip not in proxies: proxies.append(ip)
         except requests.exceptions.RequestException as exc: #Handle no response from ip
             view.remove(ip)
+            if ip in replicas: replicas.remove(ip)
+            if ip in proxies: proxies.remove(ip)
     
 
 heartBeat()
