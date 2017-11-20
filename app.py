@@ -6,6 +6,7 @@ from flask import request, abort, jsonify, json
 from flask_restful import Resource, Api
 import re, sys, os, requests
 import datetime
+import threading
 
 app = Flask(__name__)
 api = Api(app)
@@ -68,6 +69,25 @@ def removeProxie(ip):
     proxies.remove(ip)
     view.remove(ip)
     print("Proxie: " + ip + " removed.")
+
+def heartBeat():
+    threading.Timer(5.0, heartBeat).start()
+    print "Heartbeat"
+    sys.stdout.flush()
+    for ip in view:
+        try:
+            response = requests.get(http_str + ip + '/kv-store/' + "get_node_details")
+            if response['result'] == 'success':
+                if (response['replica'] == 'Yes') and (ip not in replicas) : #add ip to replica list if needed
+                    replicas.append(ip)
+                elif (response['replica'] == 'No') and (ip in replicas) : #remove from replicas list if needed
+                    replicas.remove(ip)
+                    if ip not in proxies: proxies.append(ip)
+        except requests.exceptions.RequestException as exc: #Handle no response from ip
+            view.remove(ip)
+    
+
+heartBeat()
 
 def updateRatio():
     # If Replicas is less than K
