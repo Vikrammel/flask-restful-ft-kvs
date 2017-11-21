@@ -21,9 +21,9 @@ EnvView = os.environ.get('VIEW')
 
 # Is this a replica or a proxy?
 isReplica = False
-# Dictionary acting as vector clock. IpPort -> local clock value.
+# Dictionaries acting as a vector clock and timestamps. key -> local clock value/timestamp.
 vClock = {}
-vClock[IpPort] = 0
+timestamps = {}
 # String to prepend onto URL.
 http_str = 'http://'
 
@@ -52,6 +52,8 @@ else:
 #function to compare 2 vector clocks.
 #return value: -1 -> clock1 smaller, 0 -> concurrent, 1 -> clock2 smaller
 def compareClocks(clock1, clock2):
+    if (clock1 == '') || (clock2 == ''):
+        return 0
     compareResult = 0
     if clock1.len() == clock2.len():
         for i in range(0,clock1.len()):
@@ -118,7 +120,7 @@ def heartBeat():
     #gossip between replicas to sync different kvs
     for ip in replicas:
         for key in d:
-            readRepair(key)
+            broadcastKey(key, d[key], vClock[key], timestamps[key])
 
 def updateView(self, key):
     # Checks to see if ip_port was given in the data payload
@@ -192,28 +194,27 @@ def updateRatio():
             tempNode = proxies[-1]
             replicas.append(tempNode)
             removeProxie(tempNode)
-    # If more replicas then needed, convert to proxie.    
+    # If more replicas then needed, convert to proxie.
     if len(replicas) > K:
         tempNode = replicas[-1]
         proxies.append(tempNode)
         removeReplica(tempNode)
 
-def broadcastKey(key, value, payload, time):
-    for address in replicas:
-        response = requests.put((http_str + address + '/kv-store/' + key), data = {'val': value, 'causal_payload': payload, 'timestamp': time})
-
 #read-repair function
 def readRepair(key):
-    highestCP = vClock[key]
     for ip in replicas:
         try:
             response = requests.get(http_str + ip + '/kv-store/' + key)
-            if response.causal_payload > highestCP:
-                d[key] = response.value
-                highestCP = response.causal_payload
+            if response[causal_payload] > vClock[key]:
+                d[key] = response[value]
+                vClock[key] = response[causal_payload]
+                timestamps[key] = response[timestamp]
         except requests.exceptions.RequestException as exc: #Handle no response from ip
-            view.remove(ip)
-            replicas.remove(ip)
+            removeReplica(ip)
+
+def broadcastKey(key, value, payload, time):
+    for address in replicas:
+        response = requests.put((http_str + address + '/kv-store/' + key), data = {'val': value, 'causal_payload': payload, 'timestamp': time})
 
 class Handle(Resource):
     if isReplica:
@@ -226,31 +227,38 @@ class Handle(Resource):
             if key == 'get_all_replicas':
                 return {"result": "success", "replicas": replicas}, 200
             
-            # Get attached timestamp, or set it if empty.
-            try:
-                time = request.form['timestamp']
-            except:
-                time = ''
-            if time is None:
-                time = datetime.datetime.now().time()
-            
-            #Handle a new causality chain.
-            try:
-                causalPayload = request.form['casual_payload']
-            except:
-                causalPayload = ''
-                pass
-            if causalPayload is None:
-                if vClock[key] is None:
-                    vClock[key] = 0
-            
-            # TODO In the case that the client payload is higher than ours, do we find another node with a higher payload?
-            
             #If key is not in dict, return error.
             if key not in d:
                 return {'result': 'Error', 'msg': 'Key does not exist'}, 404
+            
+            clientRequest = False
+            #Get attached timestamp, or set it if empty.
+            try:
+                timestamps[key] = request.form['timestamp']
+            except:
+                timestamps[key] = ''
+            if timestamps[key] is '':
+                timestamps[key] = datetime.datetime.now().time()
+                clientRequest = True
+            
+            #Handle a new causality chain.
+            try:
+                causalPayload = request.form['causal_payload']
+            except:
+                causalPayload = ''
+                pass
+            if causalPayload is '':
+                if vClock[key] is None:
+                    vClock[key] = 0
+            #Handle early get requests.
+            if causal_payload > vClock[key]:
+                readRepair(key)
+            
+            #Increment vector clock when client get operation succeeds.
+            if clientRequest:
+                vClock[key] += 1
             #If key is in dict, return its corresponding value.
-            return {'result': 'Success', 'value': d[key], 'node_id': IpPort, 'causal_payload': vClock, 'timestamp': datetime.datetime.now().time()}, 200
+            return {'result': 'Success', 'value': d[key], 'node_id': IpPort, 'causal_payload': vClock[key], 'timestamp': timestamps[key]}, 200
         
         #Handles PUT request
         def put(self, key):
@@ -267,11 +275,6 @@ class Handle(Resource):
             if not value:
                 return {'result': 'Error', 'msg': 'No value provided'}, 403
             
-            try:
-                causalPayload = request.form['casual_payload']
-            except:
-                causalPayload = ''
-            
             #Restricts key length to 1<=key<=200 characters.
             if not 1 <= len(str(key)) <= 200:
                 return {'result': 'Error', 'msg': 'Key not valid'}, 403
@@ -283,34 +286,39 @@ class Handle(Resource):
             if sys.getsizeof(value) > 1000000:
                 return {'result': 'Error', 'msg': 'Object too large. Size limit is 1MB'}, 403
             
-            broadcast = False
+            clientRequest = False
             #Get attached timestamp, or set it if empty.
             try:
-                time = request.form['timestamp']
+                timestamps[key] = request.form['timestamp']
             except:
-                time = ''
-            if time is None:
-                time = datetime.datetime.now().time()
-                broadcast = True
+                timestamps[key] = ''
+            if timestamps[key] is '':
+                timestamps[key] = datetime.datetime.now().time()
+                clientRequest = True
             
-            d[key] = value
+            try:
+                causalPayload = request.form['causal_payload']
+            except:
+                causalPayload = ''
             #If causal payload is none, and replica key is none initialize payload to 0 and set key value.
-            if causalPayload is None:
+            if causalPayload is '':
                 if vClock[key] is None:
                     vClock[key] = 0
-                    if broadcast:
-                        broadcastKey(key, value, vClock{key}, time, broadcast)
-            #TODO handle if broadcast is none or not, also handle different payloads
+            #Handle early put requests.
+            if causal_payload > vClock[key]:
+                readRepair(key)
             
-            # Increment vector clock when put operation succeeds.
-            vClock{key} += 1
+            #Increment vector clock when put operation succeeds.
+            vClock[key] += 1
             #Actually set the value.
             d[key] = value
+            if clientRequest:
+                broadcastKey(key, value, vClock[key], timestamps[key])
             #If key is not already in dict, create a new entry.
             if key not in d:
-                return {'replaced': 'False', 'msg': 'New key created', 'node_id': IpPort, 'causal_payload': vClock, 'timestamp': time}, 201
+                return {'replaced': 'False', 'msg': 'New key created', 'node_id': IpPort, 'causal_payload': vClock[key], 'timestamp': timestamps[key]}, 201
             #If key already exists, set replaced to true.
-            return {'replaced': 'True', 'msg': 'Value of existing key replaced', 'node_id': IpPort, 'causal_payload': vClock, 'timestamp': time}, 200
+            return {'replaced': 'True', 'msg': 'Value of existing key replaced', 'node_id': IpPort, 'causal_payload': vClock[key], 'timestamp': timestamps[key]}, 200
             
         #Handles DEL request
         def delete(self, key):
@@ -320,7 +328,7 @@ class Handle(Resource):
 
             #If key is in dict, delete key->value pair.
             del d[key]
-            return {'result': 'Success', 'node_id': IP, 'causal_payload': vClock, 'timestamp': datetime.datetime.now().time()}, 200
+            return {'result': 'Success', 'node_id': IP, 'causal_payload': vClock[key], 'timestamp': timestamps[key]}, 200
         
     else:
         #Handle requests from forwarding instance.
@@ -341,7 +349,7 @@ class Handle(Resource):
                 pass
             if not value:
                 return {'result': 'Error', 'msg': 'No value provided'}, 403
-        #Try requesting primary.
+            #Try requesting primary.
             try:
                 response = requests.put((http_str + mainAddr + '/kv-store/' + key), data = {'val': value})
             except requests.exceptions.RequestException as exc: #Handle primary failure upon put request.
