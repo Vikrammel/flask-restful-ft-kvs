@@ -129,7 +129,8 @@ def updateView(self, key):
     # Check if IP is already in our view
     if ip_payload in view:
         return {'result': 'error', 'msg': 'Ip is already in view'}, 403
-
+    
+    # TODO fix add and remove to correctly change replicas with respect to K
     if _type == 'add':
         print(K)
         print(len(replicas))
@@ -168,6 +169,7 @@ def updateView(self, key):
         return {"msg": "success", "number_of_nodes": len(view)}, 200
     return {'result': 'error', 'msg': 'Request type not valid'}, 403
 
+# TODO Not currently being used, need to call this in update view add
 def updateRatio():
     # If Replicas is less than K
     if len(replicas) < K:
@@ -181,6 +183,12 @@ def updateRatio():
             tempNode = replicas[-1]
             proxies.append(tempNode)
             removeReplica(tempNode)
+
+def broadcastKey(key, payload, value):
+    for address in view:
+        if i is not IpPort:
+            response = requests.put((http_str + address + '/kv-store/' + key), data = {'val': value, 'causal_payload': payload, 'broadcast':broadcast})
+
 
 
 
@@ -227,10 +235,17 @@ class Handle(Resource):
             if not value:
                 return {'result': 'Error', 'msg': 'No value provided'}, 403
             
-            # If causal payload is none
-            if not causalPayload:
-                # TODO Set up when causal payload is none
-                pass
+            # If causal payload is none, and replica key is none
+            # initialize payload to 1 and set key value
+            if causalPayload is None:
+                if vClock{key} is None:
+                    # Increment local clock from null to 1
+                    vClock{key} = 1
+                    d{key} = value
+                    broadcastKey(key, vClock{key}, value)
+
+            #TODO handle if broadcast is none or not, also handle different payloads
+
 
             #Restricts key length to 1<=key<=200 characters.
             if not 1 <= len(str(key)) <= 200:
@@ -243,7 +258,7 @@ class Handle(Resource):
             if sys.getsizeof(value) > 1000000:
                 return {'result': 'Error', 'msg': 'Object too large. Size limit is 1MB'}, 403
             
-            # TODO compare causalPayload with this nodes casualPayload
+            # TODO Modify code below this
 
             vClock[IpPort] += 1
             #If key is not already in dict, create a new entry.
@@ -282,12 +297,12 @@ class Handle(Resource):
                 value = ''
                 pass
             if not value:
-                return {'result': 'Error', 'msg': 'No value provided', 'node_id': IP, 'causal_payload': vClock, 'timestamp': datetime.datetime.now().time()}, 403
+                return {'result': 'Error', 'msg': 'No value provided'}, 403
         #Try requesting primary.
             try:
                 response = requests.put((http_str + mainAddr + '/kv-store/' + key), data = {'val': value})
             except requests.exceptions.RequestException as exc: #Handle primary failure upon put request.
-                return {'result': 'Error','msg': 'Server unavailable', 'node_id': IP, 'causal_payload': vClock, 'timestamp': datetime.datetime.now().time()}, 500
+                return {'result': 'Error','msg': 'Server unavailable'}, 500
             return response.json()
 
         def delete(self, key):
@@ -295,7 +310,7 @@ class Handle(Resource):
             try:
                 response = requests.delete(http_str + mainAddr + '/kv-store/' + key)
             except requests.exceptions.RequestException as exc: #Handle primary failure upon delete request.
-                return {'result': 'Error','msg': 'Server unavailable', 'node_id': IP, 'causal_payload': vClock, 'timestamp': datetime.datetime.now().time()}, 500
+                return {'result': 'Error','msg': 'Server unavailable'}, 500
             return response.json()
 api.add_resource(Handle, '/kv-store/<key>')
 
