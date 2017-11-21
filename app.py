@@ -115,6 +115,10 @@ def heartBeat():
                 then a "dead" node is back'''
         except requests.exceptions.RequestException as exc: #Handle no response from i
             pass
+    #gossip between replicas to sync different kvs
+    for ip in replicas:
+        for key in d:
+            readRepair(key)
 
 def updateView(self, key):
     # Checks to see if ip_port was given in the data payload
@@ -197,6 +201,19 @@ def updateRatio():
 def broadcastKey(key, value, payload, time):
     for address in replicas:
         response = requests.put((http_str + address + '/kv-store/' + key), data = {'val': value, 'causal_payload': payload, 'timestamp': time})
+
+#read-repair function
+def readRepair(key):
+    highestCP = vClock[key]
+    for ip in replicas:
+        try:
+            response = requests.get(http_str + ip + '/kv-store/' + key)
+            if response.causal_payload > highestCP:
+                d[key] = response.value
+                highestCP = response.causal_payload
+        except requests.exceptions.RequestException as exc: #Handle no response from ip
+            view.remove(ip)
+            replicas.remove(ip)
 
 class Handle(Resource):
     if isReplica:
