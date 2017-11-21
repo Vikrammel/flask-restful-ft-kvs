@@ -53,7 +53,7 @@ else:
 #return value: -1 -> clock1 smaller, 0 -> concurrent, 1 -> clock2 smaller
 def compareClocks(clock1, clock2):
     compareResult = 0
-    if clock1.len() == clock2.len() :   # might need to change these to len(clock1) ect
+    if clock1.len() == clock2.len():
         for i in range(0,clock1.len()):
             if clock1[i] < clock2[i] :
                 if compareResult == 1:
@@ -83,7 +83,7 @@ def heartBeat():
     threading.Timer(5.0, heartBeat).start()
     if debug:
         print "Heartbeat"
-		sys.stdout.flush()
+        sys.stdout.flush()
     for ip in view:
         if ip != IpPort:
             try:
@@ -137,66 +137,66 @@ def updateView(self, key):
     if ip_payload in view:
         return {'result': 'error', 'msg': 'Ip is already in view'}, 403
     
-    # TODO fix add and remove to correctly change replicas with respect to K
     if _type == 'add':
+        if ip_payload in view:
+            return {'result': 'error', 'msg': 'Node already in view'}, 403
         if debug:
             print(K)
             print(len(replicas))
         
-        if (len(replicas) < K):
-            # Creates new replica
+        # Creates new replica.
+        if len(replicas) < K:
             replicas.append(ip_payload)
             view.append(ip_payload)
-            if ip_payload in notInView: notInView.remove(ip_payload)
+            if ip_payload in notInView:
+                notInView.remove(ip_payload)
             if debug:
                 print("New replica created.")
-				sys.stdout.flush()
-        
+                sys.stdout.flush()
+        # Creates new proxy.
         else:
-            # Creates new proxy
             proxies.append(ip_payload)
             view.append(ip_payload)
-            if ip_payload in notInView: notInView.remove(ip_payload)
+            if ip_payload in notInView:
+                notInView.remove(ip_payload)
             if debug:
                 print("New proxie created.")
-				sys.stdout.flush()
+                sys.stdout.flush()
         return {"msg": "success", "node_id": ip_payload, "number_of_nodes": len(view)}, 200
 
     if _type == 'remove':
-        # Check to see if IP is in our view
+        # Check to see if IP is in our view.
         if ip_payload not in view:
-            return {'result': 'error', 'msg': 'Cannot remove, IP is not in view'}, 403
+            return {'result': 'error', 'msg': 'Node is not in view'}, 403
         
-        # Check if replica
+        # Check if replica.
         if replica.index(ip_payload) > 0:
             removeReplica(ip_payload)
-        # Check if proxie
+        # Check if proxie.
         if proxies.index(ip_payload) > 0:
             removeProxie(ip_payload)
-        # Update Replica/Proxie Ratio if needed
+        # Update Replica/Proxie Ratio if needed.
         updateRatio()
         return {"msg": "success", "number_of_nodes": len(view)}, 200
     return {'result': 'error', 'msg': 'Request type not valid'}, 403
 
-# TODO Not currently being used, need to call this in update view add
 def updateRatio():
-    # If Replicas is less than K
+    # If Replicas is less than K...
     if len(replicas) < K:
-        # Try to convert proxie to replica
+        # Try to convert proxie to replica.
         if len(proxies) > 0:
             tempNode = proxies[-1]
             replicas.append(tempNode)
             removeProxie(tempNode)
-    # If more replicas then needed, convert to proxie        
+    # If more replicas then needed, convert to proxie.    
     if len(replicas) > K:
-            tempNode = replicas[-1]
-            proxies.append(tempNode)
-            removeReplica(tempNode)
+        tempNode = replicas[-1]
+        proxies.append(tempNode)
+        removeReplica(tempNode)
 
-def broadcastKey(key, payload, value):
-    for address in view:
-        if i is not IpPort:
-            response = requests.put((http_str + address + '/kv-store/' + key), data = {'val': value, 'causal_payload': payload, 'broadcast':broadcast})
+def broadcastKey(key, value, payload, time):
+    for address in replicas:
+        response = requests.put((http_str + address + '/kv-store/' + key), data = {'val': value, 'causal_payload': payload, 'timestamp': time})
 
 class Handle(Resource):
     if isReplica:
@@ -208,16 +208,24 @@ class Handle(Resource):
             #Special command: Returns list of replicas.
             if key == 'get_all_replicas':
                 return {"result": "success", "replicas": replicas}, 200
-
+            
+            # Get attached timestamp, or set it if empty.
+            try:
+                time = request.form['timestamp']
+            except:
+                time = ''
+            if time is None:
+                time = datetime.datetime.now().time()
+            
+            #Handle a new causality chain.
             try:
                 causalPayload = request.form['casual_payload']
-            #Handle a new causality chain.
             except:
                 causalPayload = ''
                 pass
             if causalPayload is None:
-                if vClock{key} is None:
-                    vClock{key} = 0
+                if vClock[key] is None:
+                    vClock[key] = 0
             
             # TODO In the case that the client payload is higher than ours, do we find another node with a higher payload?
             
@@ -246,15 +254,6 @@ class Handle(Resource):
                 causalPayload = request.form['casual_payload']
             except:
                 causalPayload = ''
-            # If causal payload is none, and replica key is none initialize payload to 0 and set key value.
-            if causalPayload is None:
-                if vClock{key} is None:
-                    vClock{key} = 0
-                    d{key} = value
-                    broadcastKey(key, vClock{key}, value)
-
-            #TODO handle if broadcast is none or not, also handle different payloads
-            
             
             #Restricts key length to 1<=key<=200 characters.
             if not 1 <= len(str(key)) <= 200:
@@ -267,15 +266,34 @@ class Handle(Resource):
             if sys.getsizeof(value) > 1000000:
                 return {'result': 'Error', 'msg': 'Object too large. Size limit is 1MB'}, 403
             
+            broadcast = False
+            #Get attached timestamp, or set it if empty.
+            try:
+                time = request.form['timestamp']
+            except:
+                time = ''
+            if time is None:
+                time = datetime.datetime.now().time()
+                broadcast = True
+            
+            d[key] = value
+            #If causal payload is none, and replica key is none initialize payload to 0 and set key value.
+            if causalPayload is None:
+                if vClock[key] is None:
+                    vClock[key] = 0
+                    if broadcast:
+                        broadcastKey(key, value, vClock{key}, time, broadcast)
+            #TODO handle if broadcast is none or not, also handle different payloads
+            
             # Increment vector clock when put operation succeeds.
             vClock{key} += 1
+            #Actually set the value.
+            d[key] = value
             #If key is not already in dict, create a new entry.
             if key not in d:
-                d[key] = value
-                return {'replaced': 'False', 'msg': 'New key created', 'node_id': IpPort, 'causal_payload': vClock, 'timestamp': datetime.datetime.now().time()}, 201
+                return {'replaced': 'False', 'msg': 'New key created', 'node_id': IpPort, 'causal_payload': vClock, 'timestamp': time}, 201
             #If key already exists, set replaced to true.
-            d[key] = value
-            return {'replaced': 'True', 'msg': 'Value of existing key replaced', 'node_id': IpPort, 'causal_payload': vClock, 'timestamp': datetime.datetime.now().time()}, 200
+            return {'replaced': 'True', 'msg': 'Value of existing key replaced', 'node_id': IpPort, 'causal_payload': vClock, 'timestamp': time}, 200
             
         #Handles DEL request
         def delete(self, key):
