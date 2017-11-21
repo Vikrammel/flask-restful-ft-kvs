@@ -88,8 +88,62 @@ def heartBeat():
             if ip in replicas: replicas.remove(ip)
             if ip in proxies: proxies.remove(ip)
     
+def updateView(self, key):
+    # Checks to see if ip_port was given in the data payload
+    try:
+        ip_payload = request.form['ip_port']
+    except:
+        ip_payload = ''
 
-heartBeat()
+    # Checks to see if request parameter 'type' was given, and what its value is set to
+    try:
+        _type = request.args.get('type')
+    except: 
+        _type = ''
+
+    # If payload is empty
+    if ip_payload == '':
+        return {'result': 'error', 'msg': 'Payload missing'}, 403
+
+    # Check if IP is already in our view
+    if ip_payload in view:
+        return {'result': 'error', 'msg': 'Ip is already in view'}, 403
+
+    if _type == 'add':
+        print(K)
+        print(len(replicas))
+
+        
+        if (len(replicas) < K):
+            # Creates new replica
+            replicas.append(ip_payload)
+            view.append(ip_payload)
+            print("New replica created.")
+            sys.stdout.flush()
+            
+        else:
+            # Creates new 
+            proxies.append(ip_payload)
+            view.append(ip_payload)
+            print("New proxie created.")
+            sys.stdout.flush()
+        return {"msg": "success", "node_id": ip_payload, "number_of_nodes": len(view)}, 200
+
+    if _type == 'remove':
+        # Check to see if IP is in our view
+        if ip_payload not in view:
+            return {'result': 'error', 'msg': 'Cannot remove, IP is not in view'}, 403
+        
+        # Check if replica
+        if replica.index(ip_payload) > 0:
+            removeReplica(ip_payload)
+        # Check if proxie
+        if proxies.index(ip_payload) > 0:
+            removeProxie(ip_payload)
+        # Update Replica/Proxie Ratio if needed
+        updateRatio()
+        return {"msg": "success", "number_of_nodes": len(view)}, 200
+    return {'result': 'error', 'msg': 'Request type not valid'}, 403
 
 def updateRatio():
     # If Replicas is less than K
@@ -105,6 +159,8 @@ def updateRatio():
             proxies.append(tempNode)
             removeReplica(tempNode)
 
+
+
 class Handle(Resource):
     if isReplica:
         #Handles GET request
@@ -115,10 +171,17 @@ class Handle(Resource):
             #Special command: Returns list of replicas.
             if key == 'get_all_replicas':
                 return {"result": "success", "replicas": replicas}, 200
+
+            try:
+                causalPayload = request.form['casual_payload']
+            except:
+                # TODO Do we need to return error here? Stating no causal payload
+                # TODO In the case that the client payload is higher than ours, do we find another node with a higher payload?
+                pass
             
             #If key is not in dict, return error.
             if key not in d:
-                return {'result': 'Error', 'msg': 'Key does not exist', 'node_id': IpPort, 'causal_payload': vClock, 'timestamp': datetime.datetime.now().time()}, 404
+                return {'result': 'Error', 'msg': 'Key does not exist'}, 404
             #If key is in dict, return its corresponding value.
             return {'result': 'Success', 'value': d[key], 'node_id': IpPort, 'causal_payload': vClock, 'timestamp': datetime.datetime.now().time()}, 200
         
@@ -126,61 +189,7 @@ class Handle(Resource):
         def put(self, key):
             #Special command: Handles adding/deleting nodes.
             if key == 'update_view':
-                # Checks to see if ip_port was given in the data payload
-                try:
-                    ip_payload = request.form['ip_port']
-                except:
-                    ip_payload = ''
-
-                # Checks to see if request parameter 'type' was given, and what its value is set to
-                try:
-                    _type = request.args.get('type')
-                except: 
-                    _type = ''
-
-                # If payload is empty
-                if ip_payload == '':
-                    return {'result': 'error', 'msg': 'Payload missing'}, 403
-                
-                # Check if IP is already in our view
-                if ip_payload in view:
-                    return {'result': 'error', 'msg': 'Ip is already in view'}, 403
-
-                if _type == 'add':
-                    print(K)
-                    print(len(replicas))
-
-                    
-                    if (len(replicas) < K):
-                        # Creates new replica
-                        replicas.append(ip_payload)
-                        view.append(ip_payload)
-                        print("New replica created.")
-                        sys.stdout.flush()
-                        
-                    else:
-                        # Creates new 
-                        proxies.append(ip_payload)
-                        view.append(ip_payload)
-                        print("New proxie created.")
-                        sys.stdout.flush()
-                    return {"msg": "success", "node_id": ip_payload, "number_of_nodes": len(view)}, 200
-
-                if _type == 'remove':
-                    # Check to see if IP is in our view
-                    if ip_payload not in view:
-                        return {'result': 'error', 'msg': 'Cannot remove, IP is not in view'}, 403
-                    
-                    # Check if replica
-                    if replica.index(ip_payload) > 0:
-                        removeReplica(ip_payload)
-                    # Check if proxie
-                    if proxies.index(ip_payload) > 0:
-                        removeProxie(ip_payload)
-                    # Update Replica/Proxie Ratio if needed
-                    updateRatio()
-                    return {"msg": "success", "number_of_nodes": len(view)}, 200
-                return {'result': 'error', 'msg': 'Request type not valid'}, 403
+                updateView(self, key)
             
             #Makes sure a value was actually supplied in the PUT.
             try:
@@ -188,19 +197,31 @@ class Handle(Resource):
             except:
                 value = ''
                 pass
+            try:
+                causalPayload = request.form['casual_payload']
+            except:
+                causalPayload = ''
             if not value:
-                return {'result': 'Error', 'msg': 'No value provided', 'node_id': IpPort, 'causal_payload': vClock, 'timestamp': datetime.datetime.now().time()}, 403
+                return {'result': 'Error', 'msg': 'No value provided'}, 403
+            
+            # If causal payload is none
+            if not causalPayload:
+                # TODO Set up when causal payload is none
+                pass
+
             #Restricts key length to 1<=key<=200 characters.
             if not 1 <= len(str(key)) <= 200:
-                return {'result': 'Error', 'msg': 'Key not valid', 'node_id': IpPort, 'causal_payload': vClock, 'timestamp': datetime.datetime.now().time()}, 403
+                return {'result': 'Error', 'msg': 'Key not valid'}, 403
             #Restricts key to alphanumeric - both uppercase and lowercase, 0-9, and _
             if not re.match(r'^\w+$', key):
-                return {'result': 'Error', 'msg': 'Key not valid', 'node_id': IpPort, 'causal_payload': vClock, 'timestamp': datetime.datetime.now().time()}, 403
+                return {'result': 'Error', 'msg': 'Key not valid'}, 403
 
             #Restricts value to a maximum of 1Mbyte.
             if sys.getsizeof(value) > 1000000:
-                return {'result': 'Error', 'msg': 'Object too large. Size limit is 1MB', 'node_id': IpPort, 'causal_payload': vClock, 'timestamp': datetime.datetime.now().time()}, 403
+                return {'result': 'Error', 'msg': 'Object too large. Size limit is 1MB'}, 403
             
+            # TODO compare causalPayload with this nodes casualPayload
+
             vClock[IpPort] += 1
             #If key is not already in dict, create a new entry.
             if key not in d:
@@ -214,7 +235,7 @@ class Handle(Resource):
         def delete(self, key):
             #If key is not in dict, return error.
             if key not in d:
-                return {'result': 'Error', 'msg': 'Key does not exist', 'node_id': IP, 'causal_payload': vClock, 'timestamp': datetime.datetime.now().time()}, 404
+                return {'result': 'Error', 'msg': 'Key does not exist'}, 404
 
             #If key is in dict, delete key->value pair.
             del d[key]
@@ -227,7 +248,7 @@ class Handle(Resource):
             try:
                 response = requests.get(http_str + mainAddr + '/kv-store/' + key)
             except requests.exceptions.RequestException as exc: #Handle primary failure upon get request.
-                return {'result': 'Error','msg': 'Server unavailable', 'node_id': IP, 'causal_payload': vClock, 'timestamp': datetime.datetime.now().time()}, 500
+                return {'result': 'Error','msg': 'Server unavailable'}, 500
             return response.json()
         
         def put(self,key):
@@ -257,4 +278,5 @@ api.add_resource(Handle, '/kv-store/<key>')
 
 if __name__ == "__main__":
     localAddress = IpPort.split(":")
+    heartBeat()
     app.run(host=localAddress[0], port=localAddress[1])
