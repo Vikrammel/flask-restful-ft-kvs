@@ -11,6 +11,8 @@ import threading
 app = Flask(__name__)
 api = Api(app)
 newline = "&#13;&#10;"
+# Debug printing boolean.
+debug = True
 
 # Get expected environment variables.
 K = int(os.environ.get('K'))
@@ -29,7 +31,7 @@ http_str = 'http://'
 d = {}
 # Arrays to store replicas and proxies.
 view = []
-notInView =[] #keep track of nodes not in view to see if they're back online
+notInView = [] # Keep track of nodes not in view to see if they're back online.
 replicas = []
 proxies = []
 
@@ -40,10 +42,12 @@ pos = view.index(IpPort)
 if pos < K:
     isReplica = True
     replicas.append(IpPort)
-    print("Replica Added, Replica length = " + str(len(replicas)))
+    if debug:
+        print("Replica Added, Replica length = " + str(len(replicas)))
 else:
     proxies.append(IpPort)
-    print("Proxie Added, Proxie length = " + str(len(proxies)))
+    if debug:
+        print("Proxie Added, Proxie length = " + str(len(proxies)))
 
 #function to compare 2 vector clocks.
 #return value: -1 -> clock1 smaller, 0 -> concurrent, 1 -> clock2 smaller
@@ -65,18 +69,21 @@ def removeReplica(ip):
     replicas.remove(ip)
     view.remove(ip)
     notInView.append(ip)
-    print("Replica: " + ip + " removed.")
+    if debug:
+        print("Replica: " + ip + " removed.")
 
 def removeProxie(ip):
     proxies.remove(ip)
     view.remove(ip)
     notInView.append(ip)
-    print("Proxie: " + ip + " removed.")
+    if debug:
+        print("Proxie: " + ip + " removed.")
 
 def heartBeat():
     threading.Timer(5.0, heartBeat).start()
-    print "Heartbeat"
-    sys.stdout.flush()
+    if debug:
+        print "Heartbeat"
+		sys.stdout.flush()
     for ip in view:
         if ip != IpPort:
             try:
@@ -132,25 +139,27 @@ def updateView(self, key):
     
     # TODO fix add and remove to correctly change replicas with respect to K
     if _type == 'add':
-        print(K)
-        print(len(replicas))
-
+        if debug:
+            print(K)
+            print(len(replicas))
         
         if (len(replicas) < K):
             # Creates new replica
             replicas.append(ip_payload)
             view.append(ip_payload)
             if ip_payload in notInView: notInView.remove(ip_payload)
-            print("New replica created.")
-            sys.stdout.flush()
-            
+            if debug:
+                print("New replica created.")
+				sys.stdout.flush()
+        
         else:
             # Creates new proxy
             proxies.append(ip_payload)
             view.append(ip_payload)
             if ip_payload in notInView: notInView.remove(ip_payload)
-            print("New proxie created.")
-            sys.stdout.flush()
+            if debug:
+                print("New proxie created.")
+				sys.stdout.flush()
         return {"msg": "success", "node_id": ip_payload, "number_of_nodes": len(view)}, 200
 
     if _type == 'remove':
@@ -189,9 +198,6 @@ def broadcastKey(key, payload, value):
         if i is not IpPort:
             response = requests.put((http_str + address + '/kv-store/' + key), data = {'val': value, 'causal_payload': payload, 'broadcast':broadcast})
 
-
-
-
 class Handle(Resource):
     if isReplica:
         #Handles GET request
@@ -205,10 +211,15 @@ class Handle(Resource):
 
             try:
                 causalPayload = request.form['casual_payload']
+            #Handle a new causality chain.
             except:
-                # TODO Do we need to return error here? Stating no causal payload
-                # TODO In the case that the client payload is higher than ours, do we find another node with a higher payload?
+                causalPayload = ''
                 pass
+            if causalPayload is None:
+                if vClock{key} is None:
+                    vClock{key} = 0
+            
+            # TODO In the case that the client payload is higher than ours, do we find another node with a higher payload?
             
             #If key is not in dict, return error.
             if key not in d:
@@ -228,25 +239,23 @@ class Handle(Resource):
             except:
                 value = ''
                 pass
+            if not value:
+                return {'result': 'Error', 'msg': 'No value provided'}, 403
+            
             try:
                 causalPayload = request.form['casual_payload']
             except:
                 causalPayload = ''
-            if not value:
-                return {'result': 'Error', 'msg': 'No value provided'}, 403
-            
-            # If causal payload is none, and replica key is none
-            # initialize payload to 1 and set key value
+            # If causal payload is none, and replica key is none initialize payload to 0 and set key value.
             if causalPayload is None:
                 if vClock{key} is None:
-                    # Increment local clock from null to 1
-                    vClock{key} = 1
+                    vClock{key} = 0
                     d{key} = value
                     broadcastKey(key, vClock{key}, value)
 
             #TODO handle if broadcast is none or not, also handle different payloads
-
-
+            
+            
             #Restricts key length to 1<=key<=200 characters.
             if not 1 <= len(str(key)) <= 200:
                 return {'result': 'Error', 'msg': 'Key not valid'}, 403
@@ -258,9 +267,8 @@ class Handle(Resource):
             if sys.getsizeof(value) > 1000000:
                 return {'result': 'Error', 'msg': 'Object too large. Size limit is 1MB'}, 403
             
-            # TODO Modify code below this
-
-            vClock[IpPort] += 1
+            # Increment vector clock when put operation succeeds.
+            vClock{key} += 1
             #If key is not already in dict, create a new entry.
             if key not in d:
                 d[key] = value
