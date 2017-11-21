@@ -29,6 +29,7 @@ http_str = 'http://'
 d = {}
 # Arrays to store replicas and proxies.
 view = []
+notInView =[] #keep track of nodes not in view to see if they're back online
 replicas = []
 proxies = []
 
@@ -63,11 +64,13 @@ def compareClocks(clock1, clock2):
 def removeReplica(ip):
     replicas.remove(ip)
     view.remove(ip)
+    notInView.append(ip)
     print("Replica: " + ip + " removed.")
 
 def removeProxie(ip):
     proxies.remove(ip)
     view.remove(ip)
+    notInView.append(ip)
     print("Proxie: " + ip + " removed.")
 
 def heartBeat():
@@ -75,19 +78,37 @@ def heartBeat():
     print "Heartbeat"
     sys.stdout.flush()
     for ip in view:
+        if ip != IpPort:
+            try:
+                response = requests.get(http_str + ip + '/kv-store/' + "get_node_details")
+                if response['result'] == 'success':
+                    if (response['replica'] == 'Yes') and (ip not in replicas) : #add ip to replica list if needed
+                        replicas.append(ip)
+                        if ip in proxies: proxies.remove(ip)
+                    elif (response['replica'] == 'No') and (ip in replicas) : #remove from replicas list if needed
+                        replicas.remove(ip)
+                        if ip not in proxies: proxies.append(ip)
+            except requests.exceptions.RequestException as exc: #Handle no response from ip
+                view.remove(ip)
+                if ip in replicas: replicas.remove(ip)
+                if ip in proxies: proxies.remove(ip)
+                notInView.append(ip)
+    for ip in notInView: #check if any nodes not currently in view came back online
         try:
             response = requests.get(http_str + ip + '/kv-store/' + "get_node_details")
             if response['result'] == 'success':
-                if (response['replica'] == 'Yes') and (ip not in replicas) : #add ip to replica list if needed
+                if response['replica'] == 'Yes' : #add to replicas if needed
                     replicas.append(ip)
-                elif (response['replica'] == 'No') and (ip in replicas) : #remove from replicas list if needed
-                    replicas.remove(ip)
-                    if ip not in proxies: proxies.append(ip)
-        except requests.exceptions.RequestException as exc: #Handle no response from ip
-            view.remove(ip)
-            if ip in replicas: replicas.remove(ip)
-            if ip in proxies: proxies.remove(ip)
-    
+                    view.append(ip)
+                elif response['replica'] == 'No' : #add to proxies if needed
+                    proxies.append(ip)
+                    view.append(ip)
+                notInView.remove(ip)
+                '''call functions to resolve partitions at this point because if response from ip in notInView is a success,
+                then a "dead" node is back'''
+        except requests.exceptions.RequestException as exc: #Handle no response from i
+            pass
+
 def updateView(self, key):
     # Checks to see if ip_port was given in the data payload
     try:
@@ -118,13 +139,15 @@ def updateView(self, key):
             # Creates new replica
             replicas.append(ip_payload)
             view.append(ip_payload)
+            if ip_payload in notInView: notInView.remove(ip_payload)
             print("New replica created.")
             sys.stdout.flush()
             
         else:
-            # Creates new 
+            # Creates new proxy
             proxies.append(ip_payload)
             view.append(ip_payload)
+            if ip_payload in notInView: notInView.remove(ip_payload)
             print("New proxie created.")
             sys.stdout.flush()
         return {"msg": "success", "node_id": ip_payload, "number_of_nodes": len(view)}, 200
