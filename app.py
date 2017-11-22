@@ -61,7 +61,6 @@ else:
 #     if debug:
 #         print("Proxie Added, Proxie length = " + str(len(proxies)))
 
-
 #function to compare 2 vector clocks.
 #return value: -1 -> clock1 smaller, 0 -> concurrent, 1 -> clock2 smaller
 def compareClocks(clock1, clock2):
@@ -93,7 +92,6 @@ def removeProxie(ip):
     if debug:
         print("Proxie: " + ip + " removed.")
         sys.stdout.flush()
-
 
 def heartBeat():
     heart = threading.Timer(3.0, heartBeat)
@@ -171,23 +169,22 @@ def updateView(self, key):
         ip_payload = request.form['ip_port']
     except:
         ip_payload = ''
-
+    
     # Checks to see if request parameter 'type' was given, and what its value is set to
     try:
         _type = request.args.get('type')
     except: 
         _type = ''
-
+    
     # If payload is empty
     if ip_payload == '':
         return {'result': 'error', 'msg': 'Payload missing'}, 403
-
+    
     if _type == 'add':
-
         # Check if IP is already in our view
         if ip_payload in view:
             return {'result': 'error', 'msg': 'Ip is already in view'}, 403
-
+        
         if debug:
             print(K)
             print(len(replicas))
@@ -212,9 +209,9 @@ def updateView(self, key):
             if debug:
                 print("New proxie created.")
                 sys.stdout.flush()
-
+        
         return {"msg": "success", "node_id": ip_payload, "number_of_nodes": len(view)}, 200
-
+        
     if _type == 'remove':
         # Check to see if IP is in our view
         if ip_payload not in view:
@@ -260,9 +257,7 @@ def readRepair(key):
 
 def broadcastKey(key, value, payload, time):
     for address in replicas:
-
         if address != IpPort:
-
             print("Address: " + str(address)+ " Address type: " + str(type(address)))
             print("IpPort: " + str(IpPort)+ " IpPort type: " + str(type(IpPort)))
             print("KEY: " + str(key)+ " Address type: " + str(type(key)))
@@ -321,8 +316,8 @@ class Handle(Resource):
             #Special command: Handles adding/deleting nodes.
             if key == 'update_view':
                 return updateView(self, key)
-
-            #Special command: Force read repair.
+            
+            #Special command: Force read repair and view update.
             if key == '_update!':
                 try:
                     view = request.form['view']
@@ -333,8 +328,8 @@ class Handle(Resource):
                     return {"result": "error", 'msg': 'System command parameter error'}, 403
                 for key in d:
                     readRepair(key)
-                    return {"result": "success"}, 200
-
+                return {"result": "success"}, 200
+            
             #Makes sure a value was actually supplied in the PUT.
             try:
                 value = request.form['val']
@@ -355,15 +350,14 @@ class Handle(Resource):
             #Restricts key to alphanumeric - both uppercase and lowercase, 0-9, and _
             if not re.match(r'^\w+$', key):
                 return {'result': 'error', 'msg': 'Key not valid'}, 403
-
+            
             #Restricts value to a maximum of 1Mbyte.
             if sys.getsizeof(value) > 1000000:
                 return {'result': 'error', 'msg': 'Object too large. Size limit is 1MB'}, 403
-
+            
             clientRequest = False
             #Get attached timestamp, or set it if empty.
-
-
+            
             try:
                 timestamp = request.form['timestamp']
             except:
@@ -410,9 +404,6 @@ class Handle(Resource):
                 return {'result': 'success', 'node_id': IpPort, 'causal_payload': vClock[key], 'timestamp': storedTimeStamp[key]}, responseCode
             #If key already exists, set replaced to true.
             return {'result': 'success', 'node_id': IpPort, 'causal_payload': vClock[key], 'timestamp': storedTimeStamp[key]}, responseCode
-
-            
-
             
             # Increment vector clock when put operation succeeds.
             #vClock[key] += 1
@@ -432,6 +423,18 @@ class Handle(Resource):
     else:
         #Handle requests from forwarding instance.
         def get(self, key):
+            #Special command: Force read repair and view update.
+            if key == '_update!':
+                try:
+                    view = request.form['view']
+                    notInView = request.form['notInView']
+                    replicas = request.form['replicas']
+                    proxies = request.form['proxies']
+                    return {"result": "success"}, 200
+                except:
+                    return {"result": "error", 'msg': 'System command parameter error'}, 403
+                return {"result": "success"}, 200
+            
             #Try to retrieve timestamp and cp of read request.
             try:
                 timestamp = request.form['timestamp']
