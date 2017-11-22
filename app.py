@@ -182,11 +182,12 @@ def updateView(self, key):
     if ip_payload == '':
         return {'result': 'error', 'msg': 'Payload missing'}, 403
 
-    # Check if IP is already in our view
-    if ip_payload in view:
-        return {'result': 'error', 'msg': 'Ip is already in view'}, 403
-    
     if _type == 'add':
+
+        # Check if IP is already in our view
+        if ip_payload in view:
+            return {'result': 'error', 'msg': 'Ip is already in view'}, 403
+
         if debug:
             print(K)
             print(len(replicas))
@@ -220,10 +221,10 @@ def updateView(self, key):
             return {'result': 'error', 'msg': 'Cannot remove, IP is not in view'}, 403
         
         # Check if replica
-        if replica.index(ip_payload) > 0:
+        if ip_payload in replicas:
             removeReplica(ip_payload)
         # Check if proxie
-        if proxies.index(ip_payload) > 0:
+        if ip_payload in proxies:
             removeProxie(ip_payload)
         # Update Replica/Proxie Ratio if needed
         updateRatio()
