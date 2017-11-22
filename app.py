@@ -4,9 +4,7 @@
 from flask import Flask
 from flask import request, abort, jsonify, json
 from flask_restful import Resource, Api
-import re, sys, os, requests
-import datetime
-import threading
+import re, sys, os, requests, datetime, threading, random
 
 app = Flask(__name__)
 api = Api(app)
@@ -333,12 +331,41 @@ class Handle(Resource):
     else:
         #Handle requests from forwarding instance.
         def get(self, key):
-            #Try requesting primary.
+             #try to retrieve timestamp and cp of read request
             try:
-                response = requests.get(http_str + mainAddr + '/kv-store/' + key)
-            except requests.exceptions.RequestException as exc: #Handle primary failure upon get request.
-                return {'result': 'Error','msg': 'Server unavailable'}, 500
-            return response.json()
+                timestamp = request.form['timestamp']
+                causalPayload = request.form['causal_payload']
+                #Try requesting random replicas
+                noResp = True
+                while noResp
+                    repIp = random.choice(replicas)
+                    try:
+                    response = requests.get(http_str + repIp + '/kv-store/' + key, data={'causal_payload': causalPayload, 'timestamp': timestamp})
+                    except requests.exceptions.RequestException as exc: #Handle replica failure
+                        removeReplica()
+                        continue
+                    noResp = False
+            except: # if no cp or timestamp is provided
+                #check if cp or ts is missing, set to empty if missing
+                try:
+                    timestamp = request.form['timestamp']
+                except:
+                    timestamp = ''
+                try:
+                    causalPayload = request.form['causal_payload']
+                except:
+                    causalPayload = ''
+                #Try requesting random replicas, with one or two empty strings for cp and/or ts
+                noResp = True
+                while noResp
+                    repIp = random.choice(replicas)
+                    try:
+                    response = requests.get(http_str + repIp + '/kv-store/' + key, data={'causal_payload': causalPayload, 'timestamp': timestamp})
+                    except requests.exceptions.RequestException as exc: #Handle replica failure
+                        removeReplica()
+                        continue
+                    noResp = False
+            
         
         def put(self,key):
             #Makes sure a value was actually supplied in the PUT.
