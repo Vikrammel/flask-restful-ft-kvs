@@ -78,15 +78,13 @@ def removeProxie(ip):
     if debug:
         print("Proxie: " + ip + " removed.")
 
-dead = False
-heart = threading.Timer(5.0, heartBeat)
-def heartBeat():
+def heartBeat(dead, heart):
     try:
         heart.start()
-		if dead:
-			heart.cancel()
+        if dead:
+            heart.cancel()
     except (KeyboardInterrupt, SystemExit):
-		dead = True
+        dead = True
         cleanup_stop_thread()
         sys.exit()
     if debug:
@@ -128,6 +126,10 @@ def heartBeat():
                     requests.put((http_str + ip + kv_str + key), data = {'val': value, 'causal_payload': vClock[key], 'timestamp': timestamps[key]})
         except requests.exceptions.RequestException as exc: #Handle no response from ip
             pass
+dead = False
+heart = threading.Timer(5.0, heartBeat)
+def heartPump():
+	heartBeat(dead, heart)
 
 def updateView(self, key):
     # Checks to see if ip_port was given in the data payload.
@@ -368,6 +370,8 @@ class Handle(Resource):
             #Try requesting random replicas
             noResp = True
             while noResp
+				if replicas.len < 1:
+					return {'result': 'Error', 'msg': 'Server unavailable'}, 500
                 repIp = random.choice(replicas)
                 try:
                     response = requests.get(http_str + repIp + '/kv-store/' + key, data={'causal_payload': causalPayload, 'timestamp': timestamp})
@@ -386,11 +390,30 @@ class Handle(Resource):
                 pass
             if not value:
                 return {'result': 'Error', 'msg': 'No value provided'}, 403
-            #Try requesting primary.
+            #Try to retrieve timestamp and cp of read request.
             try:
-                response = requests.put((http_str + mainAddr + kv_str + key), data = {'val': value})
-            except requests.exceptions.RequestException as exc: #Handle primary failure upon put request.
-                return {'result': 'Error','msg': 'Server unavailable'}, 500
+                timestamp = request.form['timestamp']
+            except:
+                timestamp = ''
+                pass
+            try:
+                causalPayload = request.form['causal_payload']
+            except:
+                causalPayload = ''
+                pass
+            #Try requesting random replicas
+            noResp = True
+            while noResp
+				if replicas.len < 1:
+					return {'result': 'Error', 'msg': 'Server unavailable'}, 500
+                repIp = random.choice(replicas)
+                try:
+                    response = requests.put((http_str + repIp + kv_str + key), data = {'val': value, 'causal_payload': causalPayload, 'timestamp': timestamp})
+                except requests.exceptions.RequestException as exc: #Handle replica failure
+                    removeReplica()
+                    continue
+                noResp = False
+            #Try requesting primary.
             return response.json()
 
         def delete(self, key):
@@ -404,5 +427,5 @@ api.add_resource(Handle, '/kv-store/<key>')
 
 if __name__ == "__main__":
     localAddress = IpPort.split(":")
-    heartBeat()
+    heartPump()
     app.run(host=localAddress[0], port=localAddress[1])
