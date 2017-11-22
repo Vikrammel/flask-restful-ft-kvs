@@ -38,15 +38,13 @@ proxies = []
 view = EnvView.split(",")
 pos = view.index(IpPort)
 # Initialize this node as a replica or a proxy.
-if pos < K:
+for i in view:
+    if view.index(i) < K:
+        replicas.append(i)
+    else:
+        proxies.append(i)
+if IpPort is in replicas:
     isReplica = True
-    replicas.append(IpPort)
-    if debug:
-        print("Replica Added, Replica length = " + str(len(replicas)))
-else:
-    proxies.append(IpPort)
-    if debug:
-        print("Proxie Added, Proxie length = " + str(len(proxies)))
 
 #function to compare 2 vector clocks.
 #return value: -1 -> clock1 smaller, 0 -> concurrent, 1 -> clock2 smaller
@@ -79,21 +77,16 @@ def removeProxie(ip):
         print("Proxie: " + ip + " removed.")
 
 def heartBeat(dead, heart):
-    try:
-        heart.start()
-        if dead:
-            heart.cancel()
-    except (KeyboardInterrupt, SystemExit):
-        dead = True
-        cleanup_stop_thread()
-        sys.exit()
+    heart = threading.Timer(5.0, heartBeat)
+    heart.daemon = True
+    heart.start()
     if debug:
         print "Heartbeat"
         sys.stdout.flush()
     for ip in view:
         if ip != IpPort:
             try:
-                response = requests.get(http_str + ip + kv_str + "get_node_details")
+                response = (requests.get(http_str + ip + kv_str + "get_node_details")).json()
                 if response['result'] == 'success':
                     if (response['replica'] == 'Yes') and (ip not in replicas) : #add ip to replica list if needed
                         replicas.append(ip)
@@ -103,14 +96,14 @@ def heartBeat(dead, heart):
                         removeReplica(ip)
                         if ip not in proxies:
                             proxies.append(ip)
-            except requests.exceptions.RequestException as exc: #Handle no response from ip
+            except requests.exceptions.RequestException: #Handle no response from ip
                 if ip in replicas:
                     removeReplica(ip)
                 if ip in proxies:
                     removeProxie(ip)
     for ip in notInView: #check if any nodes not currently in view came back online
         try:
-            response = requests.get(http_str + ip + kv_str + "get_node_details")
+            response = (requests.get(http_str + ip + kv_str + "get_node_details")).json()
             if response['result'] == 'success':
                 if response['replica'] == 'Yes' : #add to replicas if needed
                     replicas.append(ip)
@@ -119,17 +112,12 @@ def heartBeat(dead, heart):
                     proxies.append(ip)
                     view.append(ip)
                 notInView.remove(ip)
-                '''call functions to resolve partitions at this point because if response from ip in notInView is a success,
-                then a "dead" node is back'''
+                #call functions to resolve partitions at this point because if response from ip in notInView is a success, then a "dead" node is back
                 #gossip between replicas to sync different kvs
                 for key in d:
                     requests.put((http_str + ip + kv_str + key), data = {'val': value, 'causal_payload': vClock[key], 'timestamp': timestamps[key]})
-        except requests.exceptions.RequestException as exc: #Handle no response from ip
+        except requests.exceptions.RequestException: #Handle no response from ip
             pass
-dead = False
-heart = threading.Timer(5.0, heartBeat)
-def heartPump():
-	heartBeat(dead, heart)
 
 def updateView(self, key):
     # Checks to see if ip_port was given in the data payload.
@@ -203,7 +191,7 @@ def updateRatio():
         if len(proxies) > 0:
             tempNode = proxies[-1]
             replicas.append(tempNode)
-            removeProxie(tempNode))
+            removeProxie(tempNode)
             requests.put(http_str + tempNode + kv_str + '_update!', data = {"view": view, "notInView": notInView, "replicas": replicas, "proxies": proxies})
     # If more replicas then needed, convert to proxie.
     if len(replicas) > K:
@@ -225,7 +213,11 @@ def readRepair(key):
 
 def broadcastKey(key, value, payload, time):
     for address in replicas:
-        requests.put((http_str + address + kv_str + key), data = {'val': value, 'causal_payload': payload, 'timestamp': time})
+        if address is not IpPort:
+            try:
+                requests.put((http_str + address + kv_str + key), data = {'val': value, 'causal_payload': payload, 'timestamp': time})
+            except request.exceptions.RequestException:
+                removeReplica(address)
 
 class Handle(Resource):
     if isReplica:
@@ -233,7 +225,10 @@ class Handle(Resource):
         def get(self, key):
             #Special command: Returns if node is a replica.
             if key == 'get_node_details':
-                return {"result": "success", "replica": isReplica}, 200
+                answer = 'No'
+                if isReplica:
+                    answer = 'Yes'
+                return {"result": "success", "replica": answer}, 200
             #Special command: Returns list of replicas.
             if key == 'get_all_replicas':
                 return {"result": "success", "replicas": replicas}, 200
@@ -249,7 +244,7 @@ class Handle(Resource):
             except:
                 timestamps[key] = ''
             if timestamps[key] is '':
-                timestamps[key] = datetime.datetime.now().time()
+                timestamps[key] = int(datetime.datetime.now().time())
                 clientRequest = True
             
             #Handle a new causality chain.
@@ -264,6 +259,9 @@ class Handle(Resource):
             #Handle early get requests.
             if causal_payload > vClock[key]:
                 readRepair(key)
+                #if causal_payload > vClock[key]:
+                #    return {'result': 'Error', 'msg': 'Server unavailable'}, 500
+                vClock[key] = causal_payload
             
             #Increment vector clock when client get operation succeeds.
             if clientRequest:
@@ -312,11 +310,11 @@ class Handle(Resource):
             clientRequest = False
             #Get attached timestamp, or set it if empty.
             try:
-                timestamps[key] = request.form['timestamp']
+                timestamp = request.form['timestamp']
             except:
-                timestamps[key] = ''
-            if timestamps[key] is '':
-                timestamps[key] = datetime.datetime.now().time()
+                timestamp = ''
+            if timestamp is '':
+                timestamp = int(datetime.datetime.now().time())
                 clientRequest = True
             
             try:
@@ -327,16 +325,27 @@ class Handle(Resource):
             if causalPayload is '':
                 if vClock[key] is None:
                     vClock[key] = 0
-            #Handle early put requests.
-            if causal_payload > vClock[key]:
-                readRepair(key)
-            
-            #Actually set the value.
-            d[key] = value
-            if clientRequest:
-                #Increment vector clock when client put operation succeeds.
-                vClock[key] += 1
-                broadcastKey(key, value, vClock[key], timestamps[key])
+            .
+            if causal_payload >= vClock[key]:
+                #Actually set the value
+                if causal_payload == vClock[key]:
+                    if timestamps[key] < timestamp:
+                        d[key] = value
+                    elif timestamps[key] == timestamp:
+                        if d[key] < value
+                            d[key] = value
+                else:
+                    d[key] = value
+                    
+                #Handle early put requests.
+                if causal_payload > vClock[key]:
+                    vClock[key] = causal_payload
+                
+                if clientRequest:
+                    #Increment vector clock when client put operation succeeds.
+                    vClock[key] += 1
+                    timestamps[key] = timestamp
+                    broadcastKey(key, value, vClock[key], timestamps[key])
             #If key is not already in dict, create a new entry.
             if key not in d:
                 return {'replaced': 'False', 'msg': 'New key created', 'node_id': IpPort, 'causal_payload': vClock[key], 'timestamp': timestamps[key]}, 201
@@ -369,9 +378,9 @@ class Handle(Resource):
                 pass
             #Try requesting random replicas
             noResp = True
-            while noResp
-				if replicas.len < 1:
-					return {'result': 'Error', 'msg': 'Server unavailable'}, 500
+            while noResp:
+                if replicas.len < 1:
+                    return {'result': 'Error', 'msg': 'Server unavailable'}, 500
                 repIp = random.choice(replicas)
                 try:
                     response = requests.get(http_str + repIp + '/kv-store/' + key, data={'causal_payload': causalPayload, 'timestamp': timestamp})
@@ -381,7 +390,7 @@ class Handle(Resource):
                 noResp = False
             return response.json()
         
-        def put(self,key):
+        def put(self, key):
             #Makes sure a value was actually supplied in the PUT.
             try:
                 value = request.form['val']
@@ -403,9 +412,9 @@ class Handle(Resource):
                 pass
             #Try requesting random replicas
             noResp = True
-            while noResp
-				if replicas.len < 1:
-					return {'result': 'Error', 'msg': 'Server unavailable'}, 500
+            while noResp:
+                if replicas.len < 1:
+                    return {'result': 'Error', 'msg': 'Server unavailable'}, 500
                 repIp = random.choice(replicas)
                 try:
                     response = requests.put((http_str + repIp + kv_str + key), data = {'val': value, 'causal_payload': causalPayload, 'timestamp': timestamp})
@@ -421,11 +430,11 @@ class Handle(Resource):
             try:
                 response = requests.delete(http_str + mainAddr + kv_str + key)
             except requests.exceptions.RequestException as exc: #Handle primary failure upon delete request.
-                return {'result': 'Error','msg': 'Server unavailable'}, 500
+                return {'result': 'Error', 'msg': 'Server unavailable'}, 500
             return response.json()
 api.add_resource(Handle, '/kv-store/<key>')
 
 if __name__ == "__main__":
     localAddress = IpPort.split(":")
-    heartPump()
+    heartBeat()
     app.run(host=localAddress[0], port=localAddress[1])
