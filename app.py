@@ -345,6 +345,7 @@ class Handle(Resource):
                         removeReplica()
                         continue
                     noResp = False
+                    return response.json()
             except: # if no cp or timestamp is provided
                 #check if cp or ts is missing, set to empty if missing
                 try:
@@ -365,6 +366,7 @@ class Handle(Resource):
                         removeReplica()
                         continue
                     noResp = False
+                    return response.json()
             
         
         def put(self,key):
