@@ -423,18 +423,6 @@ class Handle(Resource):
     else:
         #Handle requests from forwarding instance.
         def get(self, key):
-            #Special command: Force read repair and view update.
-            if key == '_update!':
-                try:
-                    view = request.form['view']
-                    notInView = request.form['notInView']
-                    replicas = request.form['replicas']
-                    proxies = request.form['proxies']
-                    return {"result": "success"}, 200
-                except:
-                    return {"result": "error", 'msg': 'System command parameter error'}, 403
-                return {"result": "success"}, 200
-            
             #Try to retrieve timestamp and cp of read request.
             try:
                 timestamp = request.form['timestamp']
@@ -461,6 +449,17 @@ class Handle(Resource):
             return response.json()
         
         def put(self, key):
+            #Special command: Force read repair and view update.
+            if key == '_update!':
+                try:
+                    view = request.form['view']
+                    notInView = request.form['notInView']
+                    replicas = request.form['replicas']
+                    proxies = request.form['proxies']
+                except:
+                    return {"result": "error", 'msg': 'System command parameter error'}, 403
+                return {"result": "success"}, 200
+            
             #Makes sure a value was actually supplied in the PUT.
             try:
                 timestamp = request.form['timestamp']
