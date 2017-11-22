@@ -178,25 +178,40 @@ def heartBeat():
                 pass
 
 def updateView(self, key):
-    # Checks to see if ip_port was given in the data payload
+    # Special condition for broadcasted changes.
     try:
+        request.form['_systemCall']
         ip_payloadU = request.form['ip_port']
-        ip_payload = ip_payloadU.encode('ascii','ignore')
+        ip_payload = ip_payloadU.encode('ascii', 'ignore')
+        _type = request.form['type']
+    
+    # Normal updateView call.
     except:
-        ip_payload = ''
+        # Checks to see if ip_port was given in the data payload
+        try:
+            ip_payloadU = request.form['ip_port']
+            ip_payload = ip_payloadU.encode('ascii', 'ignore')
+        except:
+            ip_payload = ''
 
-    # Checks to see if request parameter 'type' was given, and what its value is set to
-    try:
-        _type = request.args.get('type')
-    except: 
-        _type = ''
+        # If payload is empty
+        if ip_payload == '':
+            return {'result': 'error', 'msg': 'Payload missing'}, 403
 
-    # If payload is empty
-    if ip_payload == '':
-        return {'result': 'error', 'msg': 'Payload missing'}, 403
+        # Checks to see if request parameter 'type' was given, and what its value is set to
+        try:
+            _type = request.args.get('type')
+        except: 
+            _type = ''
+
+        for address in replicas:
+            if address != IpPort:
+                try:
+                    requests.put((http_str + address + kv_str + 'update_view'), data = {'ip_port': ip_payload, 'type': _type, '_systemCall': True})
+                except:
+                    pass
 
     if _type == 'add':
-
         # Check if IP is already in our view
         if ip_payload in view:
             return {'result': 'error', 'msg': 'Ip is already in view'}, 403
@@ -211,7 +226,6 @@ def updateView(self, key):
             view.append(ip_payload)
             if ip_payload in notInView:
                 notInView.remove(ip_payload)
-            requests.put(http_str + ip_payload + kv_str + '_update!', data = {"view": view, "notInView": notInView, "replicas": replicas, "proxies": proxies})
             if debug:
                 print("New replica created.")
                 sys.stdout.flush()
@@ -227,6 +241,8 @@ def updateView(self, key):
                 sys.stdout.flush()
         if ip_payload in removedNodes:
             removedNodes.remove(ip_payload)
+        
+        requests.put(http_str + ip_payload + kv_str + '_update!', data = {"view": view, "notInView": notInView, "replicas": replicas, "proxies": proxies})
         return {"msg": "success", "node_id": ip_payload, "number_of_nodes": len(view)}, 200
 
     if _type == 'remove':
@@ -275,9 +291,7 @@ def readRepair(key):
 
 def broadcastKey(key, value, payload, time):
     for address in replicas:
-
         if address != IpPort:
-
             print("Address: " + str(address)+ " Address type: " + str(type(address)))
             print("IpPort: " + str(IpPort)+ " IpPort type: " + str(type(IpPort)))
             print("KEY: " + str(key)+ " Address type: " + str(type(key)))
@@ -443,7 +457,6 @@ class Handle(Resource):
     else:
         #Handle requests from forwarding instance.
         def get(self, key):
-
             #Special command: Returns if node is a replica.
             if key == 'get_node_details':
                 answer = "No"
