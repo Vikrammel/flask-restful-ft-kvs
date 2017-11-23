@@ -211,8 +211,7 @@ def updateView(self, key):
             # Creates new replica
             replicas.append(ip_payload)
             view.append(ip_payload)
-            if ip_payload in notInView:
-                notInView.remove(ip_payload)
+            requests.put(http_str + ip_payload + kv_str + '_setIsReplica!', data={id: 1}) #tell node to be replica
             if debug:
                 print("New replica created.")
                 sys.stdout.flush()
@@ -221,12 +220,13 @@ def updateView(self, key):
             # Creates new proxy
             proxies.append(ip_payload)
             view.append(ip_payload)
-            if ip_payload in notInView:
-                notInView.remove(ip_payload)
             if debug:
                 print("New proxie created.")
                 sys.stdout.flush()
         
+        if ip_payload in notInView:
+                notInView.remove(ip_payload)
+
         requests.put(http_str + ip_payload + kv_str + '_update!', data = {"view": view, "notInView": notInView, "replicas": replicas, "proxies": proxies})
         return {"msg": "success", "node_id": ip_payload, "number_of_nodes": len(view)}, 200
 
@@ -349,6 +349,7 @@ class Handle(Resource):
             #Special command: Force read repair and view update.
             if key == '_update!':
                 try:
+                    global view, notInView, replicas, proxies
                     view = request.form['view']
                     notInView = request.form['notInView']
                     replicas = request.form['replicas']
@@ -525,6 +526,7 @@ class Handle(Resource):
             #Special command: Force read repair and view update.
             if key == '_update!':
                 try:
+                    global view, notInView, replicas, proxies
                     view = request.form['view']
                     notInView = request.form['notInView']
                     replicas = request.form['replicas']
