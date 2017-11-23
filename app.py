@@ -15,13 +15,15 @@ exitapp = False
 firstHeartBeat = True
 
 # Get expected environment variables.
+IpPort = os.environ.get('IPPORT')
 try:
     K = int(os.environ.get('K'))
-    EnvView = os.environ.get('VIEW')
 except:
     K = ''
+try:
+    EnvView = os.environ.get('VIEW')
+except:
     EnvView = ''
-IpPort = os.environ.get('IPPORT')
 
 # Is this a replica or a proxy?
 isReplica = False
@@ -44,7 +46,7 @@ print(isReplica)
 sys.stdout.flush()
 
 # Initialize view array based on Environment Variable 'VIEW'
-if EnvView is not None:
+if EnvView is not '':
     view = EnvView.split(",")
     pos = view.index(IpPort)
     for i in view:
@@ -225,9 +227,8 @@ def updateView(self, key):
                 sys.stdout.flush()
         
         if ip_payload in notInView:
-                notInView.remove(ip_payload)
-
-        requests.put(http_str + ip_payload + kv_str + '_update!', data = {"view": view, "notInView": notInView, "replicas": replicas, "proxies": proxies})
+            notInView.remove(ip_payload)
+        requests.put(http_str + ip_payload + kv_str + '_update!', data = {"K": K, "view": view, "notInView": notInView, "replicas": replicas, "proxies": proxies})
         return {"msg": "success", "node_id": ip_payload, "number_of_nodes": len(view)}, 200
 
     if _type == 'remove':
@@ -348,8 +349,9 @@ class Handle(Resource):
 
             #Special command: Force read repair and view update.
             if key == '_update!':
+                global K, view, notInView, replicas, proxies
                 try:
-                    global view, notInView, replicas, proxies
+                    K = request.form['K']
                     view = request.form['view']
                     notInView = request.form['notInView']
                     replicas = request.form['replicas']
@@ -369,14 +371,11 @@ class Handle(Resource):
                 except:
                     return {"result": "error", 'msg': 'ID not provided in setIsReplica'}, 403
                 if replicaDetail == "0":
-                    print("replica detail is 0")
                     isReplica = False
                 elif replicaDetail == "1":
-                    print("Replica detail is 1")
                     isReplica = True
                 else:
                     return {"result": "error", 'msg': 'Incorrect ID in setIsReplica'}, 403
-                sys.stdout.flush()
                 return {"result": "success"}, 200
 
             #Makes sure a value was actually supplied in the PUT.
@@ -484,7 +483,6 @@ class Handle(Resource):
                 timestamp = request.form['timestamp']
             except:
                 timestamp = ''
-                pass
             try:
                 causalPayload = request.form['causal_payload']
             except:
@@ -497,36 +495,19 @@ class Handle(Resource):
                     return {'result': 'error', 'msg': 'Server unavailable'}, 500
                 repIp = random.choice(replicas)
                 try:
-                    response = requests.get(http_str + repIp + '/kv-store/' + key, data={'causal_payload': causalPayload, 'timestamp': timestamp})
+                    response = requests.get(http_str + repIp + kv_str + key, data={'causal_payload': causalPayload, 'timestamp': timestamp})
                 except requests.exceptions.RequestException as exc: #Handle replica failure
                     removeReplica()
                     continue
                 noResp = False
             return response.json()
-        
-        def put(self, key):
-            global replicas
-            # Sets isReplica to True or False
-            if key == '_setIsReplica!':
-                global isReplica
-                try:
-                    uni = request.form['id']
-                    replicaDetail = uni.encode('ascii','ignore')
-                except:
-                    return {"result": "error", 'msg': 'ID not provided in SetIsReplica'}, 403
-                if replicaDetail == "0":
-                    isReplica = False
-                elif replicaDetail == "1":
-                    isReplica = True
-                    print(isReplica)
-                else:
-                    return {"result": "error", 'msg': 'Incorrect ID in SetIsReplica'}, 403
-                return {"result": "success"}, 200
 
+        def put(self, key):
             #Special command: Force read repair and view update.
             if key == '_update!':
+                global K, view, notInView, replicas, proxies
                 try:
-                    global view, notInView, replicas, proxies
+                    K = request.form['K']
                     view = request.form['view']
                     notInView = request.form['notInView']
                     replicas = request.form['replicas']
@@ -535,13 +516,28 @@ class Handle(Resource):
                     return {"result": "error", 'msg': 'System command parameter error'}, 403
                 return {"result": "success"}, 200
 
+            #Special command: Force set a node's identity as replica/proxy.
+            if key == '_setIsReplica!':
+                global isReplica
+                try:
+                    uni = request.form['id']
+                    replicaDetail = uni.encode('ascii', 'ignore')
+                except:
+                    return {"result": "error", 'msg': 'ID not provided in setIsReplica'}, 403
+                if replicaDetail == "0":
+                    isReplica = False
+                elif replicaDetail == "1":
+                    isReplica = True
+                else:
+                    return {"result": "error", 'msg': 'Incorrect ID in setIsReplica'}, 403
+                return {"result": "success"}, 200
+
             #Makes sure a value was actually supplied in the PUT.
             try:
                 uT = request.form['timestamp']
                 timestamp = uT.encode('ascii', 'ignore')
             except:
                 timestamp = ''
-                pass
             try:
                 uV = request.form['val']
                 value = uV.encode('ascii', 'ignore')
@@ -552,7 +548,6 @@ class Handle(Resource):
                 causalPayload = uC.encode('ascii', 'ignore')
             except:
                 causalPayload = ''
-                pass
             try:
                 key = key.encode('ascii', 'ignore')
             except:
@@ -564,7 +559,7 @@ class Handle(Resource):
                     return {'result': 'error', 'msg': 'Server unavailable'}, 500
                 repIp = random.choice(replicas)
                 try:
-                    response = requests.put((http_str + repIp + kv_str + key), data = {'val': value, 'causal_payload': causalPayload})
+                    response = requests.put((http_str + repIp + kv_str + key), data = {'val': value, 'causal_payload': causalPayload, 'timestamp': timestamp})
                 except requests.exceptions.RequestException as exc: #Handle replica failure
                     removeReplica(repIp)
                     continue
