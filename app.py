@@ -61,16 +61,6 @@ else:
 
 print(isReplica)
 sys.stdout.flush()
-# Initialize this node as a replica or a proxy.
-# if pos < K:
-#     isReplica = True
-#     replicas.append(IpPort)
-#     if debug:
-#         print("Replica Added, Replica length = " + str(len(replicas)))
-# else:
-#     proxies.append(IpPort)
-#     if debug:
-#         print("Proxie Added, Proxie length = " + str(len(proxies)))
 
 #function to compare 2 vector clocks.
 #return value: -1 -> clock1 smaller, 0 -> concurrent, 1 -> clock2 smaller
@@ -138,7 +128,6 @@ def heartBeat():
                     else:
                         requests.put(http_str + ip_payload + kv_str + '_setIsReplica!', data={id: 1}) #tell node to be proxy
                         view.append(ip)
-                        #replicas.append(ip)
                 notInView.remove(ip)
                 #call functions to resolve partitions at this point because if response from ip in notInView is a success, then a "dead" node is back
                 #gossip between replicas to sync different kvs
@@ -175,7 +164,7 @@ def heartBeat():
                     # print("in is in replicas")
                     # sys.stdout.flush() 
                     removeReplica(ip)
-                if ip in proxies:
+                elif ip in proxies:
                     # print("ip is in proxies")
                     # sys.stdout.flush()
                     removeProxie(ip)
@@ -259,6 +248,9 @@ def updateView(self, key):
             removeProxie(ip_payload)
         # Update Replica/Proxie Ratio if needed
         updateRatio()
+
+        if ip_payload in notInView:
+            notInView.remove(ip_payload)
         return {"msg": "success", "number_of_nodes": len(view)}, 200
     return {'result': 'error', 'msg': 'Request type not valid'}, 403
 
@@ -376,7 +368,7 @@ class Handle(Resource):
                 for key in d:
                     readRepair(key)
                 return {"result": "success"}, 200
-                
+
             #Special command: Force set a node's identity as replica/proxy.
             if key == '_setIsReplica!':
                 global isReplica
@@ -404,6 +396,7 @@ class Handle(Resource):
                 causalPayload = int(request.form['causal_payload'])
             except:
                 causalPayload = ''
+
             try:
                 key = key.encode('ascii', 'ignore')
             except:
@@ -509,12 +502,12 @@ class Handle(Resource):
                     response = requests.get(http_str + repIp + kv_str + key, data={'causal_payload': causalPayload, 'timestamp': timestamp})
                 except requests.exceptions.RequestException as exc: #Handle replica failure
                     removeReplica()
+                    notInView.append(ip)
                     continue
                 noResp = False
             return response.json()
 
         def put(self, key):
-            global replicas
             #Special command: Force read repair and view update.
             if key == '_update!':
                 global K, view, notInView, replicas, proxies
@@ -574,6 +567,7 @@ class Handle(Resource):
                     response = requests.put((http_str + repIp + kv_str + key), data = {'val': value, 'causal_payload': causalPayload, 'timestamp': timestamp})
                 except requests.exceptions.RequestException as exc: #Handle replica failure
                     removeReplica(repIp)
+                    notInView.append(ip)
                     continue
                 noResp = False
             #Try requesting primary.
