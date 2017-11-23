@@ -62,7 +62,7 @@ def sortIPs(IPArr):
     return AnsArr
 
 # Initialize view array based on Environment Variable 'VIEW'
-if EnvView is not '':
+if EnvView is not None:
     view = EnvView.split(",")
     for i in view:
         if view.index(i) < K:
@@ -101,15 +101,15 @@ def heartBeat():
         sys.stdout.flush()
 
     for ip in notInView: #check if any nodes not currently in view came back online
-        print("for notinView loop eneter")
-        sys.stdout.flush()
+        # print("for notinView loop eneter")
+        # sys.stdout.flush()
         try:
             response = (requests.get((http_str + ip + kv_str + "get_node_details"), timeout=2)).json()
             if response['result'] == 'success':
                 proxies = sortIPs(proxies)
                 replicas = sortIPs(replicas)
-                print("NotInView result = success")
-                sys.stdout.flush()
+                # print("NotInView result = success")
+                # sys.stdout.flush()
                 if response['replica'] == 'Yes' : #add to replicas if needed
                     print("replica == yes, appending to replica and view array")
                     sys.stdout.flush()
@@ -126,8 +126,8 @@ def heartBeat():
                         view = sortIPs(view)
 
                 elif response['replica'] == 'No' : #add to proxies if needed
-                    print("replica == no, appending to proxy and view array")
-                    sys.stdout.flush()
+                    # print("replica == no, appending to proxy and view array")
+                    # sys.stdout.flush()
                     if len(replicas) >= K:
                         proxies.append(ip)
                         view.append(ip)
@@ -146,12 +146,12 @@ def heartBeat():
                     for key in d:
                         requests.put((http_str + ip + kv_str + key), data = {'val': value, 'causal_payload': vClock[key], 'timestamp': timestamps[key]})
         except: #Handle no response from i
-            print("Not in view Try Failed")
-            sys.stdout.flush()
+            # print("Not in view Try Failed")
+            # sys.stdout.flush()
             pass
     for ip in view:
-        print("For IP loop Entered")
-        sys.stdout.flush()
+        # print("For IP loop Entered")
+        # sys.stdout.flush()
         if ip != IpPort:
             print("ip not equal to IPPort")
             sys.stdout.flush()
@@ -186,7 +186,7 @@ def heartBeat():
     updateRatio()
 
 def updateView(self, key):
-    global firstHeartBeat, replicas, proxies, view, notInView
+    global firstHeartBeat, replicas, proxies, view, notInView, K
     # Special condition for broadcasted changes.
     try:
         sysCall = request.form['_systemCall']
@@ -225,7 +225,27 @@ def updateView(self, key):
     if _type == 'add':
         # Check if IP is already in our view
         if ip_payload in view:
-            return {'result': 'success', 'node_id': str(ip_payload), 'number_of_nodes': str(len(view))}, 200
+            try:
+                response = requests.get(http_str + ip_payload + kv_str + 'get_all_replicas')
+            except:
+                print("Node not responding")
+                return {'result': 'error, node not responding on add'}, 500
+            try:
+                numRep = int(response['replicas'])
+            except:
+                numRep = 0
+
+            print ("numrep: " + str(numRep))
+            sys.stdout.flush()
+
+            # if numrep is 0, that means this is  a new node, but is already inside this nodes view array from an old node
+            # so we have to pass it the view, K, replicas, proxies, arrays
+            if numRep > 0:
+                return {'result': 'success', 'node_id': str(ip_payload), 'number_of_nodes': str(len(view))}, 200
+            else: 
+                headers = {'Content-Type': 'application/json', 'Accept':'application/json'}
+                requests.put(http_str + ip_payload + kv_str + '_update!', data = {"K": K, "view": view, "notInView": notInView, "replicas": replicas, "proxies": proxies})
+                return {'result': 'success', 'node_id': str(ip_payload), 'number_of_nodes': str(len(view))}, 212
 
         if debug:
             print(K)
@@ -395,11 +415,11 @@ class Handle(Resource):
             if key == '_update!':
                 global K, view, notInView, replicas, proxies
                 try:
-                    K = request.form['K']
-                    view = request.form['view']
-                    notInView = request.form['notInView']
-                    replicas = request.form['replicas']
-                    proxies = request.form['proxies']
+                    K = request.form['K'].encode('ascii', 'ignore')
+                    view = request.form['view'].encode('ascii', 'ignore')
+                    notInView = request.form['notInView'].encode('ascii', 'ignore')
+                    replicas = request.form['replicas'].encode('ascii', 'ignore')
+                    proxies = request.form['proxies'].encode('ascii', 'ignore')
                 except:
                     return {"result": "error", 'msg': 'System command parameter error'}, 403
                 for key in d:
@@ -517,6 +537,9 @@ class Handle(Resource):
                 if isReplica == True:
                     answer = "Yes"
                 return {"result": "success", "replica": answer}, 200
+                        #Special command: Returns list of replicas.
+            if key == 'get_all_replicas':
+                return {"result": "success", "replicas": replicas}, 200
 
             #Try to retrieve timestamp and cp of read request.
             try:
@@ -550,12 +573,14 @@ class Handle(Resource):
             if key == '_update!':
                 global K, view, notInView, replicas, proxies
                 try:
-                    K = request.form['K']
-                    view = request.form['view']
-                    notInView = request.form['notInView']
-                    replicas = request.form['replicas']
-                    proxies = request.form['proxies']
+                    K = request.form['K'].encode('ascii', 'ignore')
+                    view = request.form['view'].encode('ascii', 'ignore')
+                    notInView = request.form['notInView'].encode('ascii', 'ignore')
+                    replicas = request.form['replicas'].encode('ascii', 'ignore')
+                    proxies = request.form['proxies'].encode('ascii', 'ignore')
                 except:
+                    print("update failed")
+                    sys.stdout.flush()
                     return {"result": "error", 'msg': 'System command parameter error'}, 403
                 return {"result": "success"}, 200
 
