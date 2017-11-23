@@ -127,7 +127,7 @@ def heartBeat():
             # print("ip not equal to IPPort")
             # sys.stdout.flush()
             try:
-                response = (requests.get(http_str + ip + kv_str + "get_node_details")).json()
+                response = (requests.get((http_str + ip + kv_str + "get_node_details"), timeout=2)).json()
                 if response['result'] == 'success':
                     if (response['replica'] == 'Yes') and (ip not in replicas) : #add ip to replica list if needed
                         replicas.append(ip)
@@ -153,7 +153,7 @@ def heartBeat():
             # print("for notinView loop eneter")
             # sys.stdout.flush()
             try:
-                response = (requests.get(http_str + ip + kv_str + "get_node_details")).json()
+                response = (requests.get((http_str + ip + kv_str + "get_node_details"),timeout=2)).json()
                 if response['result'] == 'success':
                     # print("NotInView result = success")
                     # sys.stdout.flush()
