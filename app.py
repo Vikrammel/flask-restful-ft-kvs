@@ -201,7 +201,7 @@ def updateView(self, key):
     if _type == 'add':
         # Check if IP is already in our view
         if ip_payload in view:
-            return {'result': 'error', 'msg': 'Ip is already in view'}, 403
+            return {'result': 'success', 'node_id': str(ip_payload), 'number_of_nodes': str(len(view))}, 200
 
         if debug:
             print(K)
