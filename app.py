@@ -511,22 +511,15 @@ class Handle(Resource):
                 try:
                     uni = request.form['id']
                     replicaDetail = uni.encode('ascii','ignore')
-
                 except:
                     return {"result": "error", 'msg': 'ID not provided in SetIsReplica'}, 403
-
-                print("replicaDetail: " +str(replicaDetail))
-
                 if replicaDetail == "0":
-                    print("replica detail is 0")
                     isReplica = False
                 elif replicaDetail == "1":
-                    print("Replica detail is 1")
                     isReplica = True
                     print(isReplica)
                 else:
                     return {"result": "error", 'msg': 'Incorrect ID in SetIsReplica'}, 403
-                sys.stdout.flush()
                 return {"result": "success"}, 200
 
             #Special command: Force read repair and view update.
