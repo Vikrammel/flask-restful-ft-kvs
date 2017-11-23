@@ -15,9 +15,13 @@ exitapp = False
 firstHeartBeat = True
 
 # Get expected environment variables.
-K = int(os.environ.get('K'))
+try:
+    K = int(os.environ.get('K'))
+    EnvView = os.environ.get('VIEW')
+except:
+    K = ''
+    EnvView = ''
 IpPort = os.environ.get('IPPORT')
-EnvView = os.environ.get('VIEW')
 
 # Is this a replica or a proxy?
 isReplica = False
