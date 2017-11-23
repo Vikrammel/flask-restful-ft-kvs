@@ -42,9 +42,6 @@ notInView = [] # Keep track of nodes not in view to see if they're back online.
 replicas = []
 proxies = []
 
-print(isReplica)
-sys.stdout.flush()
-
 # Initialize view array based on Environment Variable 'VIEW'
 if EnvView is not '':
     view = EnvView.split(",")
@@ -58,25 +55,6 @@ if EnvView is not '':
         isReplica = True
 else:
     view = []
-
-print(isReplica)
-sys.stdout.flush()
-
-#function to compare 2 vector clocks.
-#return value: -1 -> clock1 smaller, 0 -> concurrent, 1 -> clock2 smaller
-def compareClocks(clock1, clock2):
-    compareResult = 0
-    if clock1.len() == clock2.len():
-        for i in range(0,clock1.len()):
-            if clock1[i] < clock2[i] :
-                if compareResult == 1:
-                    return 0
-                compareResult = -1
-            if clock2[i] < clock1[i] :
-                if compareResult == -1:
-                    return 0
-                compareResult = 1
-    return compareResult
 
 def removeReplica(ip):
     replicas.remove(ip)
@@ -254,6 +232,7 @@ def updateView(self, key):
         return {"msg": "success", "number_of_nodes": len(view)}, 200
     return {'result': 'error', 'msg': 'Request type not valid'}, 403
 
+
 def updateRatio():
     # If Replicas is less than K, try to convert proxie to replica
     while len(replicas) < K and len(proxies) > 0:
@@ -271,8 +250,8 @@ def updateRatio():
         # Add the removed replica as a proxy.
         requests.put(http_str + tempNode + kv_str + '_setIsReplica!', data = {"id": 0})
         requests.put((http_str + tempNode + kv_str + 'update_view?type=add'), data = {'ip_port': tempNode})
-#read-repair function
 
+#read-repair function
 def readRepair(key):
     for ip in replicas:
         try:
@@ -368,7 +347,7 @@ class Handle(Resource):
                 for key in d:
                     readRepair(key)
                 return {"result": "success"}, 200
-
+                
             #Special command: Force set a node's identity as replica/proxy.
             if key == '_setIsReplica!':
                 global isReplica
@@ -396,7 +375,6 @@ class Handle(Resource):
                 causalPayload = int(request.form['causal_payload'])
             except:
                 causalPayload = ''
-
             try:
                 key = key.encode('ascii', 'ignore')
             except:
@@ -508,6 +486,7 @@ class Handle(Resource):
             return response.json()
 
         def put(self, key):
+            global replicas
             #Special command: Force read repair and view update.
             if key == '_update!':
                 global K, view, notInView, replicas, proxies
@@ -564,7 +543,7 @@ class Handle(Resource):
                     return {'result': 'error', 'msg': 'Server unavailable'}, 500
                 repIp = random.choice(replicas)
                 try:
-                    response = requests.put((http_str + repIp + kv_str + key), data = {'val': value, 'causal_payload': causalPayload, 'timestamp': timestamp})
+                    response = requests.put((http_str + repIp + kv_str + key), data = {'val': value, 'causal_payload': causalPayload })
                 except requests.exceptions.RequestException as exc: #Handle replica failure
                     removeReplica(repIp)
                     notInView.append(ip)
