@@ -361,7 +361,7 @@ class Handle(Resource):
                 for key in d:
                     readRepair(key)
                 return {"result": "success"}, 200
-
+                
             #Special command: Force set a node's identity as replica/proxy.
             if key == '_setIsReplica!':
                 global isReplica
@@ -380,18 +380,20 @@ class Handle(Resource):
 
             #Makes sure a value was actually supplied in the PUT.
             try:
-                value = request.form['val']
+                value = request.form['val'].encode('ascii', 'ignore')
             except:
                 value = ''
-                pass
             if not value:
                 return {'result': 'error', 'msg': 'No value provided'}, 403
-            
             try:
                 causalPayload = int(request.form['causal_payload'])
             except:
                 causalPayload = ''
-            
+            try:
+                key = key.encode('ascii', 'ignore')
+            except:
+                print("Could not encode key.")
+                sys.stdout.flush()
             #Restricts key length to 1<=key<=200 characters.
             if not 1 <= len(str(key)) <= 200:
                 return {'result': 'error', 'msg': 'Key not valid'}, 403
@@ -414,16 +416,13 @@ class Handle(Resource):
                 tempTime = datetime.datetime.now()
                 timestamp = (tempTime-datetime.datetime(1970,1,1)).total_seconds()
                 clientRequest = True
-            
-            print(str(type(causalPayload)))
-            print(clientRequest)
-            sys.stdout.flush()
 
             responseCode = 200
-
             if key not in vClock:
                 vClock[key] = 0
                 responseCode = 201
+            if key not in storedTimeStamp:
+                storedTimeStamp[key] = 0
             
             #If causal payload is none, and replica key is none initialize payload to 0 and set key value.
             if causalPayload is '':
@@ -444,19 +443,16 @@ class Handle(Resource):
                     vClock[key] = causalPayload
                     storedTimeStamp[key] = timestamp
 
-                if clientRequest:
+                if clientRequest == True:
                     #Increment vector clock when client put operation succeeds.
                     vClock[key] += 1
                     storedTimeStamp[key] = timestamp
                     broadcastKey(key, value, vClock[key], storedTimeStamp[key])
                 return {'result': 'success', 'node_id': IpPort, 'causal_payload': vClock[key], 'timestamp': storedTimeStamp[key]}, responseCode
             #If key already exists, set replaced to true.
-            return {'result': 'success', 'node_id': IpPort, 'causal_payload': vClock[key], 'timestamp': storedTimeStamp[key]}, responseCode
-
-            # Increment vector clock when put operation succeeds.
-            #vClock[key] += 1
-            #If key is not already in dict, create a new entry.
-            #return {'replaced': 'True', 'msg': 'Value of existing key replaced', 'node_id': IpPort, 'causal_payload': vClock[key], 'timestamp': timestamp}, 200
+            if storedTimeStamp[key] == 0:
+                storedTimeStamp[key] = timestamp
+            return {'result': 'success', 'node_id': IpPort, 'causal_payload': vClock[key], 'timestamp': storeTimeStamp[key]}, responseCode
             
         #Handles DEL request
         def delete(self, key):
@@ -503,6 +499,7 @@ class Handle(Resource):
             return response.json()
 
         def put(self, key):
+            global replicas
             #Special command: Force read repair and view update.
             if key == '_update!':
                 global K, view, notInView, replicas, proxies
