@@ -153,7 +153,7 @@ def heartBeat():
             # print("for notinView loop eneter")
             # sys.stdout.flush()
             try:
-                response = (requests.get((http_str + ip + kv_str + "get_node_details"),timeout=2)).json()
+                response = (requests.get((http_str + ip + kv_str + "get_node_details"), timeout=2)).json()
                 if response['result'] == 'success':
                     # print("NotInView result = success")
                     # sys.stdout.flush()
@@ -362,6 +362,24 @@ class Handle(Resource):
                     return {"result": "error", 'msg': 'System command parameter error'}, 403
                 for key in d:
                     readRepair(key)
+                return {"result": "success"}, 200
+
+            #Special command: Force set a node's identity as replica/proxy.
+            if key == '_setIsReplica!':
+                try:
+                    uni = request.form['id']
+                    replicaDetail = uni.encode('ascii', 'ignore')
+                except:
+                    return {"result": "error", 'msg': 'ID not provided in setIsReplica'}, 403
+                if replicaDetail == "0":
+                    print("replica detail is 0")
+                    isReplica = False
+                elif replicaDetail == "1":
+                    print("Replica detail is 1")
+                    isReplica = True
+                else:
+                    return {"result": "error", 'msg': 'Incorrect ID in setIsReplica'}, 403
+                sys.stdout.flush()
                 return {"result": "success"}, 200
 
             #Makes sure a value was actually supplied in the PUT.
