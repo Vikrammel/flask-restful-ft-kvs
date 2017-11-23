@@ -1,5 +1,7 @@
-Mike: Worked on key value store / routing for main instance / docker issues / testing and debuging
+Mike: Broadcast, setup and environmental variables, encoding, get and put of replicas, fixing get/put for proxies / testing and debuging
 
-Vikram: Created router forwarding for back up instances / testing and debuging
+Vikram: Created heartbeat, read repair, ip sorting function, get node detals, get all replicas / worked on proxy forwarding, replica and proxy PUT special functions / testing and debuging
 
-Tom: Worked on key value store / error handling / docker issues / testing and debuging
+Tom: special put/get commands, system commands, update view,  / testing and debuging
+
+note: we worked together almost all of the time, many of the contributions overlap
