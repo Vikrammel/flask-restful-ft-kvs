@@ -48,7 +48,6 @@ sys.stdout.flush()
 # Initialize view array based on Environment Variable 'VIEW'
 if EnvView is not '':
     view = EnvView.split(",")
-    pos = view.index(IpPort)
     for i in view:
         if view.index(i) < K:
             replicas.append(i)
