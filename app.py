@@ -122,18 +122,29 @@ def heartBeat():
                 if response['replica'] == 'Yes' : #add to replicas if needed
                     # print("replica == yes, appending to replica and view array")
                     # sys.stdout.flush()
-                    replicas.append(ip)
-                    view.append(ip)
+                    if len(replicas) < K:
+                        replicas.append(ip)
+                        view.append(ip)
+                    else:
+                        requests.put(http_str + ip_payload + kv_str + '_setIsReplica!', data={id: 0}) #tell node to be replica
+                        view.append(ip)
+                        #proxies.append(ip)
                 elif response['replica'] == 'No' : #add to proxies if needed
                     # print("replica == no, appending to proxy and view array")
                     # sys.stdout.flush()
-                    proxies.append(ip)
-                    view.append(ip)
+                    if len(replicas) >= K:
+                        proxies.append(ip)
+                        view.append(ip)
+                    else:
+                        requests.put(http_str + ip_payload + kv_str + '_setIsReplica!', data={id: 1}) #tell node to be proxy
+                        view.append(ip)
+                        #replicas.append(ip)
                 notInView.remove(ip)
                 #call functions to resolve partitions at this point because if response from ip in notInView is a success, then a "dead" node is back
                 #gossip between replicas to sync different kvs
-                for key in d:
-                    requests.put((http_str + ip + kv_str + key), data = {'val': value, 'causal_payload': vClock[key], 'timestamp': timestamps[key]})
+                if ip in replicas:
+                    for key in d:
+                        requests.put((http_str + ip + kv_str + key), data = {'val': value, 'causal_payload': vClock[key], 'timestamp': timestamps[key]})
         except: #Handle no response from i
             # print("Not in view Try Failed")
             # sys.stdout.flush()
@@ -148,9 +159,15 @@ def heartBeat():
                 response = (requests.get((http_str + ip + kv_str + "get_node_details"), timeout=2)).json()
                 if response['result'] == 'success':
                     if (response['replica'] == 'Yes') and (ip in proxies) : #add ip to replica list if needed
-                        updateRatio()
+                        #updateRatio()
+                        if ip not in replicas:
+                            replicas.append(ip)
+                        proxies.remove(ip)
                     elif (response['replica'] == 'No') and (ip in replicas) : #remove from replicas list if needed
-                        updateRatio()
+                        #updateRatio()
+                        if ip not in proxies:
+                            proxies.append(ip)
+                        replicas.remove(ip)
             except requests.exceptions.RequestException as exc: #Handle no response from ip
                 # print("Try Failed, now inside except")
                 # sys.stdout.flush()
@@ -158,12 +175,11 @@ def heartBeat():
                     # print("in is in replicas")
                     # sys.stdout.flush() 
                     removeReplica(ip)
-                    notInView.append(ip)
                 if ip in proxies:
                     # print("ip is in proxies")
                     # sys.stdout.flush()
                     removeProxie(ip)
-                    notInView.append(ip)
+                notInView.append(ip)
 
 def updateView(self, key):
     # Special condition for broadcasted changes.
@@ -252,8 +268,8 @@ def updateRatio():
         tempNode = proxies[-1]
         removeProxie(tempNode)
         # Add the removed proxy as a replica.
-        requests.put((http_str + tempNode + kv_str + 'update_view?type=add'), data = {'ip_port': tempNode})
         requests.put(http_str + tempNode + kv_str + '_setIsReplica!', data = {"id": 1})
+        requests.put((http_str + tempNode + kv_str + 'update_view?type=add'), data = {'ip_port': tempNode})
         # Update the database and view of the new replica.
         requests.put(http_str + tempNode + kv_str + '_update!', data = {"view": view, "notInView": notInView, "replicas": replicas, "proxies": proxies})
     # If more replicas then needed, convert to proxie        
@@ -261,8 +277,8 @@ def updateRatio():
         tempNode = replicas[-1]
         removeReplica(tempNode)
         # Add the removed replica as a proxy.
-        requests.put((http_str + tempNode + kv_str + 'update_view?type=add'), data = {'ip_port': tempNode})
         requests.put(http_str + tempNode + kv_str + '_setIsReplica!', data = {"id": 0})
+        requests.put((http_str + tempNode + kv_str + 'update_view?type=add'), data = {'ip_port': tempNode})
 #read-repair function
 
 def readRepair(key):
@@ -451,7 +467,7 @@ class Handle(Resource):
             #If key already exists, set replaced to true.
             if storedTimeStamp[key] == 0:
                 storedTimeStamp[key] = timestamp
-            return {'result': 'success', 'node_id': IpPort, 'causal_payload': vClock[key], 'timestamp': storeTimeStamp[key]}, responseCode
+            return {'result': 'success', 'node_id': IpPort, 'causal_payload': vClock[key], 'timestamp': storedTimeStamp[key]}, responseCode
             
         #Handles DEL request
         def delete(self, key):
