@@ -186,15 +186,17 @@ def heartBeat():
     updateRatio()
 
 def updateView(self, key):
+    global firstHeartBeat, replicas, proxies, view, notInView
     # Special condition for broadcasted changes.
     try:
-        request.form['_systemCall']
+        sysCall = request.form['_systemCall']
         ip_payloadU = request.form['ip_port']
         ip_payload = ip_payloadU.encode('ascii', 'ignore')
         _type = request.form['type']
     
     # Normal updateView call.
     except:
+        sysCall = ''
         # Checks to see if ip_port was given in the data payload
         try:
             ip_payloadU = request.form['ip_port']
@@ -212,12 +214,13 @@ def updateView(self, key):
         except: 
             _type = ''
 
-        for address in replicas:
-            if address != IpPort:
-                try:
-                    requests.put((http_str + address + kv_str + 'update_view'), data = {'ip_port': ip_payload, 'type': _type, '_systemCall': True})
-                except:
-                    pass
+        if sysCall is not None:
+            for address in replicas:
+                if address != IpPort:
+                    try:
+                        requests.put((http_str + address + kv_str + 'update_view'), data = {'ip_port': ip_payload, 'type': _type, '_systemCall': True})
+                    except:
+                        pass
 
     if _type == 'add':
         # Check if IP is already in our view
@@ -305,6 +308,7 @@ def updateRatio():
 
 #read-repair function
 def readRepair(key):
+    global firstHeartBeat, replicas, proxies, view, notInView
     for ip in replicas:
         try:
             response = requests.get((http_str + ip + kv_str + key), timeout=2)
@@ -318,6 +322,7 @@ def readRepair(key):
             notInView = sortIPs(notInView)
 
 def broadcastKey(key, value, payload, time):
+    global firstHeartBeat, replicas, proxies, view, notInView
     for address in replicas:
         if address != IpPort:
             print("Address: " + str(address)+ " Address type: " + str(type(address)))
