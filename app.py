@@ -504,6 +504,31 @@ class Handle(Resource):
             return response.json()
         
         def put(self, key):
+            global replicas
+            # Sets isReplica to True or False
+            if key == '_setIsReplica!':
+                global isReplica
+                try:
+                    uni = request.form['id']
+                    replicaDetail = uni.encode('ascii','ignore')
+
+                except:
+                    return {"result": "error", 'msg': 'ID not provided in SetIsReplica'}, 403
+
+                print("replicaDetail: " +str(replicaDetail))
+
+                if replicaDetail == "0":
+                    print("replica detail is 0")
+                    isReplica = False
+                elif replicaDetail == "1":
+                    print("Replica detail is 1")
+                    isReplica = True
+                    print(isReplica)
+                else:
+                    return {"result": "error", 'msg': 'Incorrect ID in SetIsReplica'}, 403
+                sys.stdout.flush()
+                return {"result": "success"}, 200
+
             #Special command: Force read repair and view update.
             if key == '_update!':
                 try:
@@ -517,14 +542,25 @@ class Handle(Resource):
 
             #Makes sure a value was actually supplied in the PUT.
             try:
-                timestamp = request.form['timestamp']
+                uT = request.form['timestamp']
+                timestamp = uT.encode('ascii', 'ignore')
             except:
                 timestamp = ''
                 pass
             try:
-                causalPayload = request.form['causal_payload']
+                uV = request.form['val']
+                value = uV.encode('ascii', 'ignore')
+            except:
+                return {"result": "error", 'msg': 'No value provided'}, 403
+            try:
+                uC = request.form['causal_payload']
+                causalPayload = uC.encode('ascii', 'ignore')
             except:
                 causalPayload = ''
+                pass
+            try:
+                key = key.encode('ascii', 'ignore')
+            except:
                 pass
             #Try requesting random replicas
             noResp = True
@@ -533,9 +569,9 @@ class Handle(Resource):
                     return {'result': 'error', 'msg': 'Server unavailable'}, 500
                 repIp = random.choice(replicas)
                 try:
-                    response = requests.put((http_str + repIp + kv_str + key), data = {'val': value, 'causal_payload': causalPayload, 'timestamp': timestamp})
+                    response = requests.put((http_str + repIp + kv_str + key), data = {'val': value, 'causal_payload': causalPayload})
                 except requests.exceptions.RequestException as exc: #Handle replica failure
-                    removeReplica()
+                    removeReplica(repIp)
                     continue
                 noResp = False
             #Try requesting primary.
