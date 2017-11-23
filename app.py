@@ -56,6 +56,22 @@ if EnvView is not '':
 else:
     view = []
 
+#function to order list of IPs so that nodes can refrence the same node by index when using the
+#array for list, replicas, or proxies
+def sortIPs(IPArr):
+    #use checksum to order IPs; sum nums in IP and store in ascending order
+    def sum_digits(digit):
+        return sum(int(x) for x in digit if x.isdigit())
+    for i in range(1, len(IPArr)):
+        ip = IPArr[i]
+        ipSum = sum_digits(IPArr[i])
+        # insertion sort
+        j = i-1
+        while j >=0 and ipSum < sum_digits(IPArr[j]) :
+            IPArr[j+1] = IPArr[j]
+            j -= 1
+        IPArr[j+1] = ip
+        
 def removeReplica(ip):
     replicas.remove(ip)
     view.remove(ip)
