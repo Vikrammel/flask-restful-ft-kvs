@@ -409,10 +409,10 @@ class Handle(Resource):
                 global K, view, notInView, replicas, proxies
                 try:
                     K = request.form['K'].encode('ascii', 'ignore')
-                    view = request.form.getlist['view[]'].encode('ascii', 'ignore')
-                    notInView = request.form.getlist['notInView[]'].encode('ascii', 'ignore')
-                    replicas = request.form.getlist['replicas[]'].encode('ascii', 'ignore')
-                    proxies = request.form.getlist['proxies[]'].encode('ascii', 'ignore')
+                    view = request.form.getlist['view[]'].get_json()
+                    notInView = request.form.getlist['notInView[]'].get_json()
+                    replicas = request.form.getlist['replicas[]'].get_json()
+                    proxies = request.form.getlist['proxies[]'].get_json()
                 except:
                     return {"result": "error", 'msg': 'System command parameter error'}, 403
                 for key in d:
@@ -567,11 +567,11 @@ class Handle(Resource):
             if key == '_update!':
                 global K, view, notInView, replicas, proxies
                 try:
-                    K = request.form['K'].encode('ascii', 'ignore')
-                    view = request.form.getlist['view[]'].encode('ascii', 'ignore')
-                    notInView = request.form.getlist['notInView[]'].encode('ascii', 'ignore')
-                    replicas = request.form.getlist['replicas[]'].encode('ascii', 'ignore')
-                    proxies = request.form.getlist['proxies[]'].encode('ascii', 'ignore')
+                    K = request.form['K'].get_json()
+                    view = request.form.getlist['view[]'].get_json()
+                    notInView = request.form.getlist['notInView[]'].get_json()
+                    replicas = request.form.getlist['replicas[]'].get_json()
+                    proxies = request.form.getlist['proxies[]'].get_json()
                 except:
                     print("update failed")
                     sys.stdout.flush()
