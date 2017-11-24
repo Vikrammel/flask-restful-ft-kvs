@@ -98,7 +98,10 @@ def heartBeat():
         try:
             response = (requests.get((http_str + ip + kv_str + "get_node_details"), timeout=2)).json()
             if response['result'] == 'success':
-                proxies = sortIPs(proxies)
+                notInView.remove(ip)
+                view.append(ip)
+                view = sortIPs(view)
+                '''proxies = sortIPs(proxies)
                 replicas = sortIPs(replicas)
                 # print("NotInView result = success")
                 # sys.stdout.flush()
@@ -133,7 +136,7 @@ def heartBeat():
                 # gossip between replicas to sync different kvs
                 if ip in replicas:
                     for key in d:
-                        requests.put((http_str + ip + kv_str + key), data = {'val': value, 'causal_payload': vClock[key], 'timestamp': timestamps[key]})
+                        requests.put((http_str + ip + kv_str + key), data = {'val': value, 'causal_payload': vClock[key], 'timestamp': timestamps[key]})'''
         except: #Handle no response from i
             # print("Not in view Try Failed")
             # sys.stdout.flush()
@@ -290,25 +293,27 @@ def updateView(self, key):
     return {'result': 'error', 'msg': 'Request type not valid'}, 403
 
 def updateRatio():
-    global replicas, proxies
+    global view, replicas, proxies
     view = sortIPs(view)
     for node in view:
         # This is a replica.
         if view.index(IpPort) < K:
-            if node in proxies:
+            if node not in replicas:
+                if node in proxies
+                    proxies.remove(node)
+                replicas.append(node)
                 if node == IpPort:
                     isReplica = True
                     for key in d:
                         readRepair(key)
-                proxies.remove(node)
-                replicas.append(node)
         # This is a proxy.
         else:
-            if node in replicas:
+            if node not in proxies:
+                if node in replicas
+                    replicas.remove(node)
+                proxies.append(node)
                 if node == IpPort:
                     isReplica = False
-                replicas.remove(node)
-                proxies.append(node)
     '''# If Replicas is less than K, try to convert proxie to replica
     while len(replicas) < K and len(proxies) > 0:
         proxies = sortIPs(proxies)
