@@ -77,12 +77,6 @@ if EnvView is not None:
 else:
     view = []
 
-def arrayBlobifier(a):
-    blob = ''
-    for i in a:
-        blob += i + ','
-	return blob
-
 def removeReplica(ip):
     replicas.remove(ip)
     view.remove(ip)
@@ -241,9 +235,9 @@ def updateView(self, key):
             # so we have to pass it the view, K, replicas, proxies, arrays
             if numRep > 0:
                 return {'result': 'success', 'node_id': str(ip_payload), 'number_of_nodes': str(len(view))}, 200
-            else: 
+            else:
                 headers = {'Content-Type': 'application/json', 'Accept':'application/json'}
-                requests.put(http_str + ip_payload + kv_str + '_update!', data = {"K": K, "view": arrayBlobifier(view), "notInView": arrayBlobifier(notInView), "replicas": arrayBlobifier(replicas), "proxies": arrayBlobifier(proxies)})
+                requests.put(http_str + ip_payload + kv_str + '_update!', data = {"K": K, "view": ','.join(view), "notInView": ','.join(notInView), "replicas": ','.join(replicas), "proxies": ','.join(proxies)})
                 return {'result': 'success', 'node_id': str(ip_payload), 'number_of_nodes': str(len(view))}, 212
 
         if debug:
@@ -273,7 +267,7 @@ def updateView(self, key):
         
         if ip_payload in notInView:
             notInView.remove(ip_payload)
-		requests.put(http_str + ip_payload + kv_str + '_update!', data = {"K": K, "view": arrayBlobifier(view), "notInView": arrayBlobifier(notInView), "replicas": arrayBlobifier(replicas), "proxies": arrayBlobifier(proxies)})
+        requests.put(http_str + ip_payload + kv_str + '_update!', data = {"K": K, "view": ','.join(view), "notInView": ','.join(notInView), "replicas": ','.join(replicas), "proxies": ','.join(proxies)})
         return {"msg": "success", "node_id": ip_payload, "number_of_nodes": len(view)}, 200
 
     if _type == 'remove':
@@ -312,7 +306,7 @@ def updateRatio():
         #requests.put(http_str + tempNode + kv_str + '_setIsReplica!', data = {"id": 1})
         #requests.put((http_str + tempNode + kv_str + 'update_view?type=add'), data = {'ip_port': tempNode})
         # Update the database and view of the new replica.
-		#requests.put(http_str + tempNode + kv_str + '_update!', data = {"K": K, "view": arrayBlobifier(view), "notInView": arrayBlobifier(notInView), "replicas": arrayBlobifier(replicas), "proxies": arrayBlobifier(proxies)})
+        #requests.put(http_str + tempNode + kv_str + '_update!', data = {"K": K, "view": ','.join(view), "notInView": ','.join(notInView), "replicas": ','.join(replicas), "proxies": ','.join(proxies)})
     # If more replicas then needed, convert to proxie        
     while len(replicas) > K:
         proxies = sortIPs(proxies)
