@@ -77,6 +77,12 @@ if EnvView is not None:
 else:
     view = []
 
+def arrayBlobifier(a):
+    blob = ''
+    for i in a:
+        blob += i + ','
+	return blob
+
 def removeReplica(ip):
     replicas.remove(ip)
     view.remove(ip)
@@ -237,7 +243,7 @@ def updateView(self, key):
                 return {'result': 'success', 'node_id': str(ip_payload), 'number_of_nodes': str(len(view))}, 200
             else: 
                 headers = {'Content-Type': 'application/json', 'Accept':'application/json'}
-                requests.put(http_str + ip_payload + kv_str + '_update!', data = {"K": K, "view": view, "notInView": notInView, "replicas": replicas, "proxies": proxies})
+                requests.put(http_str + ip_payload + kv_str + '_update!', data = {"K": K, "view": arrayBlobifier(view), "notInView": arrayBlobifier(notInView), "replicas": arrayBlobifier(replicas), "proxies": arrayBlobifier(proxies)})
                 return {'result': 'success', 'node_id': str(ip_payload), 'number_of_nodes': str(len(view))}, 212
 
         if debug:
@@ -267,7 +273,7 @@ def updateView(self, key):
         
         if ip_payload in notInView:
             notInView.remove(ip_payload)
-        requests.put(http_str + ip_payload + kv_str + '_update!', data = {"K": K, "view": view, "notInView": notInView, "replicas": replicas, "proxies": proxies})
+		requests.put(http_str + ip_payload + kv_str + '_update!', data = {"K": K, "view": arrayBlobifier(view), "notInView": arrayBlobifier(notInView), "replicas": arrayBlobifier(replicas), "proxies": arrayBlobifier(proxies)})
         return {"msg": "success", "node_id": ip_payload, "number_of_nodes": len(view)}, 200
 
     if _type == 'remove':
@@ -306,7 +312,7 @@ def updateRatio():
         #requests.put(http_str + tempNode + kv_str + '_setIsReplica!', data = {"id": 1})
         #requests.put((http_str + tempNode + kv_str + 'update_view?type=add'), data = {'ip_port': tempNode})
         # Update the database and view of the new replica.
-        #requests.put(http_str + tempNode + kv_str + '_update!', data = {"view": view, "notInView": notInView, "replicas": replicas, "proxies": proxies})
+		#requests.put(http_str + tempNode + kv_str + '_update!', data = {"K": K, "view": arrayBlobifier(view), "notInView": arrayBlobifier(notInView), "replicas": arrayBlobifier(replicas), "proxies": arrayBlobifier(proxies)})
     # If more replicas then needed, convert to proxie        
     while len(replicas) > K:
         proxies = sortIPs(proxies)
@@ -409,10 +415,10 @@ class Handle(Resource):
                 global K, view, notInView, replicas, proxies
                 try:
                     K = request.form['K'].encode('ascii', 'ignore')
-                    view = request.form.getlist['view[]'].get_json()
-                    notInView = request.form.getlist['notInView[]'].get_json()
-                    replicas = request.form.getlist['replicas[]'].get_json()
-                    proxies = request.form.getlist['proxies[]'].get_json()
+                    view = request.form['view'].encode('ascii', 'ignore').split(",")
+                    notInView = request.form['notInView'].encode('ascii', 'ignore').split(",")
+                    replicas = request.form['replicas'].encode('ascii', 'ignore').split(",")
+                    proxies = request.form['proxies'].encode('ascii', 'ignore').split(",")
                 except:
                     return {"result": "error", 'msg': 'System command parameter error'}, 403
                 for key in d:
@@ -568,10 +574,10 @@ class Handle(Resource):
                 global K, view, notInView, replicas, proxies
                 try:
                     K = request.form['K'].get_json()
-                    view = request.form.getlist['view[]'].get_json()
-                    notInView = request.form.getlist['notInView[]'].get_json()
-                    replicas = request.form.getlist['replicas[]'].get_json()
-                    proxies = request.form.getlist['proxies[]'].get_json()
+                    view = request.form['view'].encode('ascii', 'ignore').split(",")
+                    notInView = request.form['notInView'].encode('ascii', 'ignore').split(",")
+                    replicas = request.form['replicas'].encode('ascii', 'ignore').split(",")
+                    proxies = request.form['proxies'].encode('ascii', 'ignore').split(",")
                 except:
                     print("update failed")
                     sys.stdout.flush()
