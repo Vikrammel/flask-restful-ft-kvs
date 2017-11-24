@@ -409,10 +409,10 @@ class Handle(Resource):
                 global K, view, notInView, replicas, proxies
                 try:
                     K = request.form['K'].encode('ascii', 'ignore')
-                    view = request.form['view'].encode('ascii', 'ignore')
-                    notInView = request.form['notInView'].encode('ascii', 'ignore')
-                    replicas = request.form['replicas'].encode('ascii', 'ignore')
-                    proxies = request.form['proxies'].encode('ascii', 'ignore')
+                    view = request.form.getlist['view[]'].encode('ascii', 'ignore')
+                    notInView = request.form.getlist['notInView[]'].encode('ascii', 'ignore')
+                    replicas = request.form.getlist['replicas[]'].encode('ascii', 'ignore')
+                    proxies = request.form.getlist['proxies[]'].encode('ascii', 'ignore')
                 except:
                     return {"result": "error", 'msg': 'System command parameter error'}, 403
                 for key in d:
@@ -568,10 +568,10 @@ class Handle(Resource):
                 global K, view, notInView, replicas, proxies
                 try:
                     K = request.form['K'].encode('ascii', 'ignore')
-                    view = request.form['view'].encode('ascii', 'ignore')
-                    notInView = request.form['notInView'].encode('ascii', 'ignore')
-                    replicas = request.form['replicas'].encode('ascii', 'ignore')
-                    proxies = request.form['proxies'].encode('ascii', 'ignore')
+                    view = request.form.getlist['view[]'].encode('ascii', 'ignore')
+                    notInView = request.form.getlist['notInView[]'].encode('ascii', 'ignore')
+                    replicas = request.form.getlist['replicas[]'].encode('ascii', 'ignore')
+                    proxies = request.form.getlist['proxies[]'].encode('ascii', 'ignore')
                 except:
                     print("update failed")
                     sys.stdout.flush()
